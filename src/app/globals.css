@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind v4 keys dark mode off prefers-color-scheme by default, which a manual
+ * toggle can never override. Re-pointing the variant at a `.dark` class puts the
+ * theme under our control; an inline script in layout.tsx applies the class
+ * before first paint, so there is no flash of the wrong theme.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Abundance Hub's surfaces.
+ *
+ * Light is a warm off-white rather than pure #fff — coaches live on these
+ * screens for hours, and paper-white glares. Dark is a desaturated slate, not
+ * pure black, so the violet accent and the score colours stay legible instead of
+ * vibrating against the background.
+ */
+:root {
+  --surface: #f7f7f9;
+  --surface-raised: #ffffff;
+  --surface-sunken: #eeeef2;
+  --border: #e3e3e9;
+  --border-strong: #cfcfd8;
+  --foreground: #17171c;
+  --muted: #6c6c7a;
+  --muted-strong: #4a4a57;
+
+  --primary: #6d4aff;
+  --primary-hover: #5c37f5;
+  --primary-foreground: #ffffff;
+  --primary-soft: #6d4aff14;
+
+  --accent: #f59e0b;
+  --ring: #6d4aff;
+}
+
+.dark {
+  --surface: #0c0c11;
+  --surface-raised: #14141b;
+  --surface-sunken: #08080c;
+  --border: #24242e;
+  --border-strong: #33333f;
+  --foreground: #ececf1;
+  --muted: #8b8b9c;
+  --muted-strong: #a9a9b8;
+
+  --primary: #8b6cff;
+  --primary-hover: #9b81ff;
+  --primary-foreground: #0c0c11;
+  --primary-soft: #8b6cff1f;
+
+  --accent: #fbbf24;
+  --ring: #8b6cff;
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-strong: var(--muted-strong);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+
+  --color-accent: var(--accent);
+  --color-ring: var(--ring);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --radius-card: 0.875rem;
+
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-slide-up: slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* One focus treatment for the whole app, so a keyboard user sees the same
+     affordance no matter which control they land on. */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  /* Respect users who have asked the OS to stop moving things. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer utilities {
+  .card-shadow {
+    box-shadow:
+      0 1px 2px 0 rgb(0 0 0 / 0.04),
+      0 1px 6px -1px rgb(0 0 0 / 0.03);
+  }
+
+  .dark .card-shadow {
+    box-shadow:
+      0 1px 2px 0 rgb(0 0 0 / 0.3),
+      0 1px 6px -1px rgb(0 0 0 / 0.2);
+  }
+
+  /* Scrollable panels — leaderboards, activity feeds — keep a thin, quiet bar. */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
+}

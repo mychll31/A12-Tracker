@@ -1,0 +1,625 @@
+// Abundance Hub — data model
+//
+// Provider note: SQLite is used so the app runs with zero external setup.
+// The schema deliberately avoids Prisma `enum` and `Json` scalars (unsupported
+// on SQLite) so it ports to PostgreSQL by changing only the datasource block
+// and the driver adapter. Status/category codes are stored as TEXT and are
+// type-narrowed in `src/lib/domain.ts`.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Prisma 7: the connection URL lives in prisma.config.ts, not here.
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------------------------------------------------------------------------
+// Identity & access
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users        User[]
+  coachGroups  CoachGroup[]
+  coreTasks    CoreTask[]
+  scoreHistory OrgScoreSnapshot[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  organizationId String
+  email          String    @unique
+  passwordHash   String
+  firstName      String
+  lastName       String
+  avatarUrl      String?
+  headline       String?
+  bio            String?
+  timezone       String    @default("UTC")
+  isActive       Boolean   @default(true)
+  joinedAt       DateTime  @default(now())
+  lastActiveAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // A user holds any combination of roles (COACH, MENTEE, ADMIN) — a single
+  // account can coach one group while being mentored inside another.
+  roles UserRole[]
+
+  // As a coach
+  coachGroups         CoachGroup[]         @relation("GroupCoach")
+  authoredNotes       CoachingNote[]       @relation("NoteAuthor")
+  grantedDelegations  CoachDelegation[]    @relation("DelegationGrantor")
+  receivedDelegations CoachDelegation[]    @relation("DelegationGrantee")
+  checkInReviews      CheckInReview[]
+  goalComments        GoalComment[]
+  coachScoreHistory   CoachScoreSnapshot[]
+
+  // As a mentee
+  memberships      GroupMembership[]
+  goals            Goal[]
+  goalUpdates      GoalUpdate[]
+  taskCompletions  CoreTaskCompletion[]
+  checkIns         DailyCheckIn[]
+  receivedNotes    CoachingNote[]       @relation("NoteSubject")
+  actionItems      NoteActionItem[]
+  scoreHistory     ScoreSnapshot[]
+  streak           UserStreak?
+  achievements     UserAchievement[]
+  leaderboardRanks LeaderboardEntry[]
+
+  // Cross-cutting
+  notifications     Notification[]
+  notificationPrefs NotificationPreference[]
+  attachments       Attachment[]
+  activityLogs      ActivityLog[]           @relation("ActivitySubject")
+  actedActivityLogs ActivityLog[]           @relation("ActivityActor")
+  delegatedFor      CoachDelegation[]       @relation("DelegationMentee")
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+model Role {
+  id          String     @id @default(cuid())
+  key         String     @unique // ADMIN | COACH | MENTEE
+  name        String
+  description String?
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  roleId    String
+  grantedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+// ---------------------------------------------------------------------------
+// Coaching structure
+// ---------------------------------------------------------------------------
+
+model CoachGroup {
+  id             String   @id @default(cuid())
+  organizationId String
+  coachId        String
+  name           String
+  description    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  coach        User                 @relation("GroupCoach", fields: [coachId], references: [id], onDelete: Cascade)
+  memberships  GroupMembership[]
+  delegations  CoachDelegation[]
+  scoreHistory GroupScoreSnapshot[]
+
+  @@index([organizationId])
+  @@index([coachId])
+  @@map("coach_groups")
+}
+
+model GroupMembership {
+  id       String    @id @default(cuid())
+  groupId  String
+  menteeId String
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+  isActive Boolean   @default(true)
+
+  group  CoachGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  mentee User       @relation(fields: [menteeId], references: [id], onDelete: Cascade)
+
+  // A mentee may re-join a group after leaving, but only one row is permitted
+  // per (group, mentee) pair — and app logic enforces at most one *active*
+  // membership overall, so a mentee belongs to exactly one coach group.
+  @@unique([groupId, menteeId])
+  @@index([menteeId, isActive])
+  @@map("group_memberships")
+}
+
+// Explicit, auditable grant that lets one coach edit another coach's mentees.
+model CoachDelegation {
+  id         String    @id @default(cuid())
+  grantorId  String
+  granteeId  String
+  groupId    String?
+  menteeId   String?
+  permission String    @default("EDIT") // EDIT | COMMENT
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  grantor User        @relation("DelegationGrantor", fields: [grantorId], references: [id], onDelete: Cascade)
+  grantee User        @relation("DelegationGrantee", fields: [granteeId], references: [id], onDelete: Cascade)
+  group   CoachGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  mentee  User?       @relation("DelegationMentee", fields: [menteeId], references: [id], onDelete: Cascade)
+
+  @@index([granteeId])
+  @@index([menteeId])
+  @@map("coach_delegations")
+}
+
+// ---------------------------------------------------------------------------
+// Goals
+// ---------------------------------------------------------------------------
+
+model GoalCategory {
+  id          String  @id @default(cuid())
+  key         String  @unique // PERSONAL | PROFESSIONAL | CONTRIBUTION
+  name        String
+  description String?
+  accent      String  @default("violet")
+  // Relative contribution of this category to the composite goal score.
+  weight      Float   @default(1)
+  isRequired  Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  goals Goal[]
+
+  @@map("goal_categories")
+}
+
+model Goal {
+  id          String    @id @default(cuid())
+  userId      String
+  categoryId  String
+  title       String
+  description String?
+  status      String    @default("NOT_STARTED") // NOT_STARTED | IN_PROGRESS | AT_RISK | COMPLETED | ABANDONED
+  progress    Int       @default(0) // 0-100; mirrors the goal task list — see scoreGoal() in src/lib/scoring.ts
+  startDate   DateTime  @default(now())
+  targetDate  DateTime
+  completedAt DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    GoalCategory @relation(fields: [categoryId], references: [id])
+  tasks       GoalTask[]
+  updates     GoalUpdate[]
+  comments    GoalComment[]
+  attachments Attachment[]
+
+  @@index([userId, status])
+  @@index([categoryId])
+  @@map("goals")
+}
+
+/// The goal's to-do list. A goal is only as done as its tasks, so these are what
+/// the goal's score is computed from — see scoreGoal() in src/lib/scoring.ts.
+model GoalTask {
+  id          String    @id @default(cuid())
+  goalId      String
+  title       String
+  isComplete  Boolean   @default(false)
+  dueDate     DateTime?
+  completedAt DateTime?
+  sortOrder   Int       @default(0)
+  /// Lets a heavy task count for more than a trivial one. Defaults to 1, so a
+  /// goal whose tasks are all unweighted scores as a plain percentage complete.
+  weight      Int       @default(1)
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@map("goal_tasks")
+}
+
+// Append-only progress ledger — powers goal trend analytics.
+model GoalUpdate {
+  id           String   @id @default(cuid())
+  goalId       String
+  authorId     String
+  progressFrom Int
+  progressTo   Int
+  statusFrom   String?
+  statusTo     String?
+  note         String?
+  createdAt    DateTime @default(now())
+
+  goal   Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, createdAt])
+  @@map("goal_updates")
+}
+
+model GoalComment {
+  id        String   @id @default(cuid())
+  goalId    String
+  authorId  String
+  body      String
+  isPrivate Boolean  @default(false) // private = visible to coaches only
+  createdAt DateTime @default(now())
+
+  goal   Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@map("goal_comments")
+}
+
+// ---------------------------------------------------------------------------
+// Core tasks (daily disciplines)
+// ---------------------------------------------------------------------------
+
+model CoreTask {
+  id             String   @id @default(cuid())
+  organizationId String
+  key            String
+  name           String
+  description    String?
+  icon           String   @default("target")
+  points         Int      @default(25)
+  sortOrder      Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  completions  CoreTaskCompletion[]
+
+  @@unique([organizationId, key])
+  @@map("core_tasks")
+}
+
+model CoreTaskCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  coreTaskId  String
+  // Day bucket, normalised to UTC midnight. Absence of a row for a past day
+  // is what makes that day "missed" — no tombstone rows required.
+  date        DateTime
+  completed   Boolean  @default(true)
+  notes       String?
+  completedAt DateTime @default(now())
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coreTask    CoreTask     @relation(fields: [coreTaskId], references: [id], onDelete: Cascade)
+  attachments Attachment[]
+
+  @@unique([userId, coreTaskId, date])
+  @@index([userId, date])
+  @@map("core_task_completions")
+}
+
+// ---------------------------------------------------------------------------
+// Daily check-in
+// ---------------------------------------------------------------------------
+
+model DailyCheckIn {
+  id            String   @id @default(cuid())
+  userId        String
+  date          DateTime // UTC midnight day bucket
+  wins          String?
+  challenges    String?
+  lessons       String?
+  gratitude     String?
+  tomorrowFocus String?
+  mood          Int      @default(3) // 1-5
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviews     CheckInReview[]
+  attachments Attachment[]
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("daily_check_ins")
+}
+
+model CheckInReview {
+  id        String   @id @default(cuid())
+  checkInId String
+  coachId   String
+  comment   String
+  createdAt DateTime @default(now())
+
+  checkIn DailyCheckIn @relation(fields: [checkInId], references: [id], onDelete: Cascade)
+  coach   User         @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  @@index([checkInId])
+  @@map("check_in_reviews")
+}
+
+// ---------------------------------------------------------------------------
+// Coaching notes
+// ---------------------------------------------------------------------------
+
+model CoachingNote {
+  id           String    @id @default(cuid())
+  coachId      String
+  menteeId     String
+  title        String
+  body         String // sanitised rich-text HTML
+  visibility   String    @default("PRIVATE") // PRIVATE | SHARED
+  followUpDate DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  coach       User             @relation("NoteAuthor", fields: [coachId], references: [id], onDelete: Cascade)
+  mentee      User             @relation("NoteSubject", fields: [menteeId], references: [id], onDelete: Cascade)
+  actionItems NoteActionItem[]
+  attachments Attachment[]
+
+  @@index([menteeId, createdAt])
+  @@index([coachId])
+  @@map("coaching_notes")
+}
+
+model NoteActionItem {
+  id          String    @id @default(cuid())
+  noteId      String
+  assigneeId  String?
+  title       String
+  isDone      Boolean   @default(false)
+  dueDate     DateTime?
+  completedAt DateTime?
+  sortOrder   Int       @default(0)
+
+  note     CoachingNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  assignee User?        @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([noteId])
+  @@map("note_action_items")
+}
+
+// ---------------------------------------------------------------------------
+// Scoring & leaderboards
+// ---------------------------------------------------------------------------
+
+model ScoreSnapshot {
+  id                String   @id @default(cuid())
+  userId            String
+  date              DateTime // UTC midnight day bucket
+  personalScore     Float    @default(0)
+  professionalScore Float    @default(0)
+  contributionScore Float    @default(0)
+  goalScore         Float    @default(0)
+  coreTaskScore     Float    @default(0)
+  consistencyScore  Float    @default(0)
+  overallScore      Float    @default(0)
+  currentStreak     Int      @default(0)
+  goalsCompleted    Int      @default(0)
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([date])
+  @@map("score_snapshots")
+}
+
+model CoachScoreSnapshot {
+  id           String   @id @default(cuid())
+  coachId      String
+  date         DateTime
+  averageScore Float    @default(0)
+  menteeCount  Int      @default(0)
+  activeCount  Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  coach User @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  @@unique([coachId, date])
+  @@map("coach_score_snapshots")
+}
+
+model GroupScoreSnapshot {
+  id           String   @id @default(cuid())
+  groupId      String
+  date         DateTime
+  averageScore Float    @default(0)
+  memberCount  Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  group CoachGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, date])
+  @@map("group_score_snapshots")
+}
+
+model OrgScoreSnapshot {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  date               DateTime
+  averageScore       Float    @default(0)
+  memberCount        Int      @default(0)
+  activeCount        Int      @default(0)
+  goalCompletionRate Float    @default(0)
+  taskCompletionRate Float    @default(0)
+  createdAt          DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, date])
+  @@map("org_score_snapshots")
+}
+
+// Materialised ranking rows. Retaining the previous board is what lets the
+// notification engine say "you moved up 3 places".
+model LeaderboardEntry {
+  id         String   @id @default(cuid())
+  board      String // GROUP | COACH | ORGANIZATION | CORE_TASK | GOAL_COMPLETION | CONSISTENCY
+  scopeId    String // group id, or organization id for org-wide boards
+  userId     String
+  rank       Int
+  score      Float
+  capturedAt DateTime
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([board, scopeId, userId, capturedAt])
+  @@index([board, scopeId, capturedAt])
+  @@map("leaderboard_entries")
+}
+
+model UserStreak {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  currentStreak Int       @default(0)
+  longestStreak Int       @default(0)
+  lastActiveDay DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_streaks")
+}
+
+// ---------------------------------------------------------------------------
+// Achievements, notifications, activity, attachments
+// ---------------------------------------------------------------------------
+
+model Achievement {
+  id          String @id @default(cuid())
+  key         String @unique
+  name        String
+  description String
+  icon        String @default("award")
+  tier        String @default("BRONZE") // BRONZE | SILVER | GOLD | PLATINUM
+  // Machine-checkable rule, e.g. {"metric":"streak","gte":30}
+  criteria    String
+
+  users UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@map("user_achievements")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  // CORE_TASK_REMINDER | MISSED_TASK | GOAL_DEADLINE | COACH_FEEDBACK |
+  // CHECK_IN_REMINDER | LEADERBOARD_CHANGE | ACHIEVEMENT_UNLOCKED | GROUP_UPDATE
+  type      String
+  title     String
+  body      String
+  link      String?
+  priority  String    @default("NORMAL") // LOW | NORMAL | HIGH
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id     String  @id @default(cuid())
+  userId String
+  type   String
+  inApp  Boolean @default(true)
+  email  Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@map("notification_preferences")
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String // whose timeline this belongs to
+  actorId    String? // who performed it (a coach acting on a mentee, etc.)
+  type       String // GOAL_CREATED | GOAL_COMPLETED | TASK_COMPLETED | CHECK_IN | NOTE_ADDED | ...
+  entityType String?
+  entityId   String?
+  summary    String
+  metadata   String? // JSON blob
+  createdAt  DateTime @default(now())
+
+  user  User  @relation("ActivitySubject", fields: [userId], references: [id], onDelete: Cascade)
+  actor User? @relation("ActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+model Attachment {
+  id         String   @id @default(cuid())
+  uploaderId String
+  fileName   String
+  mimeType   String
+  size       Int
+  url        String
+  kind       String   @default("PROOF") // PROOF | REFERENCE
+  createdAt  DateTime @default(now())
+
+  // An attachment hangs off exactly one parent; nullable FKs preserve
+  // referential integrity that a polymorphic (type, id) pair could not.
+  goalId       String?
+  checkInId    String?
+  completionId String?
+  noteId       String?
+
+  uploader   User                @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  goal       Goal?               @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  checkIn    DailyCheckIn?       @relation(fields: [checkInId], references: [id], onDelete: Cascade)
+  completion CoreTaskCompletion? @relation(fields: [completionId], references: [id], onDelete: Cascade)
+  note       CoachingNote?       @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@index([checkInId])
+  @@map("attachments")
+}
