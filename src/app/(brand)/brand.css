@@ -1,0 +1,169 @@
+/*
+ * Abundance 12 — the marketing/onboarding brand.
+ *
+ * Values copied verbatim from the design bundle (page-designs/project/*.dc.html).
+ * Scoped under `.a12` on purpose: the application's own palette lives in
+ * globals.css and is violet-on-slate with a light/dark toggle, while this is
+ * navy-and-gold and always dark. Neither may repaint the other.
+ */
+
+.a12 {
+  --a12-bg: #080c1c;
+  --a12-panel: #0d1330;
+  --a12-panel-2: #141a3a;
+  --a12-line: #1c2650;
+  --a12-line-2: #2a336b;
+  --a12-hairline: #141a38;
+
+  --a12-gold: #eab73f;
+  --a12-gold-lit: #f6d067;
+  --a12-gold-deep: #d99b2c;
+  --a12-ink: #1a1103;
+
+  --a12-cyan: #58c8ff;
+  --a12-cyan-lit: #7fe0ff;
+
+  --a12-text: #f2ecd8;
+  --a12-text-2: #e9e4d0;
+  --a12-muted: #9fa8c9;
+  --a12-muted-2: #6f7899;
+
+  --a12-green: #5ee6a8;
+  --a12-rose: #f0607a;
+
+  font-family: var(--font-inter), system-ui, sans-serif;
+  color: var(--a12-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The display face. Every heading and every number in the brand uses it. */
+.a12 .cz {
+  font-family: var(--font-cinzel), serif;
+}
+
+.a12 a {
+  color: var(--a12-gold);
+  text-decoration: none;
+}
+.a12 a:hover {
+  color: var(--a12-gold-lit);
+}
+
+.a12 input::placeholder,
+.a12 textarea::placeholder {
+  color: var(--a12-muted-2);
+}
+
+/* Text fields carry no outline of their own, so keyboard focus needs a visible
+ * border. Scoped to .a12 — the app's own inputs keep their violet ring. */
+.a12 input:focus,
+.a12 textarea:focus {
+  border-color: var(--a12-cyan);
+}
+
+/* The gold wordmark: a gradient clipped to the text. */
+.a12 .a12-gold-text {
+  background: linear-gradient(180deg, #fbe8a6 0%, #e8b843 45%, #b57e22 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.a12 .a12-cta {
+  background: linear-gradient(
+    180deg,
+    var(--a12-gold-lit),
+    var(--a12-gold-deep)
+  );
+  color: var(--a12-ink);
+}
+
+/* The sigil — the glowing orb in the nav, the footer and the final CTA. */
+.a12 .a12-orb {
+  border-radius: 50%;
+  border: 2.5px solid var(--a12-cyan);
+  background: radial-gradient(
+    circle at 50% 45%,
+    var(--a12-cyan-lit) 0%,
+    #2a6fbf 55%,
+    #0b1a33 100%
+  );
+  animation: a12-glow 3.2s ease-in-out infinite;
+}
+
+@keyframes a12-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 22px rgba(88, 200, 255, 0.5),
+      inset 0 0 12px rgba(88, 200, 255, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 34px rgba(88, 200, 255, 0.85),
+      inset 0 0 18px rgba(88, 200, 255, 0.5);
+  }
+}
+
+@keyframes a12-pulse-gold {
+  0% {
+    box-shadow: 0 0 0 0 rgba(234, 183, 63, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 16px rgba(234, 183, 63, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(234, 183, 63, 0);
+  }
+}
+
+.a12 .a12-pulse {
+  animation: a12-pulse-gold 2.8s infinite;
+}
+
+@keyframes a12-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.a12 .a12-step-in {
+  animation: a12-step-in 0.35s ease;
+}
+
+/*
+ * A double-width card in the Arsenal grid.
+ *
+ * `grid-column: span 2` cannot be set unconditionally: the grid is auto-fit, so
+ * on a phone it resolves to a SINGLE column, and an item spanning two of them
+ * conjures an implicit second column — dragging the whole page ~138px wider than
+ * the screen and cutting every section off at the right edge. The span only
+ * makes sense once the grid actually has two columns to span.
+ *
+ * `min-width: 0` for the same reason: a grid item defaults to min-width:auto,
+ * so its content can refuse to shrink and blow the track out.
+ */
+.a12 .a12-wide {
+  grid-column: span 1;
+  min-width: 0;
+}
+
+@media (min-width: 760px) {
+  .a12 .a12-wide {
+    grid-column: span 2;
+  }
+}
+
+/* A reduced-motion preference wins: the glow and the pulse are decoration. */
+@media (prefers-reduced-motion: reduce) {
+  .a12 .a12-orb,
+  .a12 .a12-pulse,
+  .a12 .a12-step-in {
+    animation: none;
+  }
+}

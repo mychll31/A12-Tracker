@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 import { requireUser } from "@/lib/auth";
 import { unreadCount } from "@/server/notifications";
 import { Sidebar } from "@/components/app-shell/sidebar";
@@ -15,6 +17,12 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const user = await requireUser();
+
+  // A new account has no goals, no circle and no first check-in. Letting them
+  // straight in would show an app full of empty states and a score of zero; the
+  // wizard is what gives them something to come back to.
+  if (user.needsOnboarding) redirect("/onboarding");
+
   const unread = await unreadCount(user.id);
   const sections = navFor(user);
 

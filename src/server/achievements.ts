@@ -63,9 +63,8 @@ function metricValue(metric: Metric, score: UserScore): number {
 }
 
 /**
- * Criteria arrive as a TEXT column (SQLite has no JSON scalar), so a malformed
- * or unknown rule must fail closed — an unreadable badge stays locked rather
- * than unlocking for everybody.
+ * Criteria arrive as a TEXT column, so a malformed or unknown rule must fail
+ * closed — an unreadable badge stays locked rather than unlocking for everybody.
  */
 function parseCriteria(raw: string): Criteria | null {
   let parsed: unknown;

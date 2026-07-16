@@ -1,9 +1,9 @@
 /**
  * The shared vocabulary of Abundance Hub.
  *
- * SQLite has no native enum type, so the schema stores these codes as TEXT.
- * This module is the single place that narrows that TEXT back into real union
- * types, and the only place a new status/category/board code should be added.
+ * The schema stores these codes as TEXT. This module is the single place that
+ * narrows that TEXT back into real union types, and the only place a new
+ * status/category/board code should be added.
  */
 
 // ---------------------------------------------------------------------------

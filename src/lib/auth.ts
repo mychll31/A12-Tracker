@@ -101,6 +101,8 @@ export type SessionUser = {
   /** The single group this user is mentored in, if any. */
   menteeGroupId: string | null;
   joinedAt: Date;
+  /** True until the onboarding wizard has been completed. */
+  needsOnboarding: boolean;
 };
 
 /**
@@ -144,13 +146,23 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     coachGroupIds: user.coachGroups.map((g) => g.id),
     menteeGroupId: user.memberships[0]?.groupId ?? null,
     joinedAt: user.joinedAt,
+    needsOnboarding: user.onboardedAt === null,
   };
 });
 
 /** For pages and actions that must have an authenticated actor. */
 export async function requireUser(): Promise<SessionUser> {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) {
+    // A cookie that no longer resolves to a user — an expired token, or an
+    // account removed since sign-in (e.g. after a local `db:reset`) — has to be
+    // cleared, or middleware keeps treating it as "signed in" and bounces the
+    // visitor /login → /dashboard → here forever. Only a route handler can
+    // delete a cookie, so hand off to one; a plain missing cookie just goes to
+    // the sign-in form.
+    const jar = await cookies();
+    redirect(jar.has(SESSION_COOKIE) ? "/api/logout?next=/login" : "/login");
+  }
   return user;
 }
 

@@ -82,7 +82,7 @@ export default async function CoachDashboardPage() {
 
       <section
         aria-label="Coaching totals"
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 [&>*]:min-w-0"
       >
         <StatCard
           label="Total mentees"
@@ -209,7 +209,7 @@ export default async function CoachDashboardPage() {
         </CardContent>
       </Card>
 
-      <section className="grid gap-6 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-3 [&>*]:min-w-0">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle as="h2">Your mentees</CardTitle>
@@ -282,7 +282,7 @@ export default async function CoachDashboardPage() {
         </Card>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-3 [&>*]:min-w-0">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle as="h2">Coaching groups</CardTitle>
@@ -435,3 +435,4 @@ export default async function CoachDashboardPage() {
     </div>
   );
 }
+

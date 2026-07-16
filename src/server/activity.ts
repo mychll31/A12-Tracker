@@ -40,7 +40,7 @@ function asActivityType(value: string): ActivityType {
     : "COMMENT_ADDED";
 }
 
-/** SQLite has no JSON scalar, so metadata round-trips through a TEXT column. */
+/** Metadata round-trips through a TEXT column. */
 function parseMetadata(raw: string | null): Record<string, unknown> | null {
   if (!raw) return null;
   try {

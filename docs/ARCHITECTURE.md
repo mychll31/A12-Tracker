@@ -8,7 +8,7 @@ How Abundance Hub is put together, and why.
 | --------- | ---------------------------------------- |
 | Framework | Next.js 16 (App Router, React 19, RSC)   |
 | Language  | TypeScript, strict                       |
-| Database  | Prisma 7 + SQLite (Postgres-ready)       |
+| Database  | Prisma 7 + Postgres                      |
 | Styling   | Tailwind v4, CSS-first tokens            |
 | Auth      | bcrypt + HS256 JWT in an httpOnly cookie |
 | Charts    | Recharts                                 |
@@ -18,7 +18,7 @@ How Abundance Hub is put together, and why.
 ```
 src/
   lib/          pure domain logic — no HTTP, no React
-    db.ts           Prisma singleton (swap the adapter to move to Postgres)
+    db.ts           Prisma singleton using the pg driver adapter
     domain.ts       every status/category/board code + the scoring weights
     dates.ts        the UTC day-bucket convention
     auth.ts         passwords, session cookie, getCurrentUser/requireUser
@@ -156,24 +156,21 @@ where the server runs.
 precisely because nothing is there. History queries re-expand the window with
 `lastNDays()` so a gap renders as a gap rather than vanishing.
 
-**Codes are TEXT, narrowed in one place.** SQLite has no enum type, so statuses
-live as TEXT and `src/lib/domain.ts` narrows them back into union types on the way
-out. It is also the only file to touch when adding a status.
+**Codes are TEXT, narrowed in one place.** Statuses live as TEXT and
+`src/lib/domain.ts` narrows them back into union types on the way out. It is also
+the only file to touch when adding a status.
 
 **Note bodies are sanitized on write.** `sanitizeNoteHtml()` in
 `src/server/notes.ts` is a strict allow-list: 13 tags, no attributes except a
 scheme-checked `href`. Rendering can trust the database because writing already
 did not.
 
-## Moving to Postgres
+## Database deployment
 
-1. `prisma/schema.prisma` — change the datasource provider to `postgresql`.
-2. `src/lib/db.ts` — swap `PrismaBetterSqlite3` for `PrismaPg`.
-3. `DATABASE_URL` — point it at the new database.
-
-No model or query changes: the schema deliberately avoids SQLite-only constructs,
-and nothing above `db.ts` knows which engine is underneath. Native `enum` types
-become available at that point, but nothing requires them.
+Vercel runs `npm run vercel-build`, which regenerates Prisma Client, applies
+migrations with `prisma migrate deploy`, then builds Next.js. `DATABASE_URL`
+should be a pooled runtime Postgres URL when the provider offers one. `DIRECT_URL`
+is optional and is used by Prisma schema commands when present.
 
 ## The nightly job
 

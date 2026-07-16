@@ -70,7 +70,7 @@ export default async function DashboardPage() {
         </p>
       </header>
 
-      <section className="grid gap-4 lg:grid-cols-[auto_1fr]">
+      <section className="grid gap-4 lg:grid-cols-[auto_1fr] [&>*]:min-w-0">
         <Card className="flex flex-col items-center justify-center gap-3 p-6 lg:w-64">
           <ScoreRing
             score={score.overallScore}
@@ -140,7 +140,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle as="h2">Today&apos;s core tasks</CardTitle>
@@ -268,7 +268,7 @@ export default async function DashboardPage() {
           </Link>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 [&>*]:min-w-0">
           <Card className="flex flex-col items-center justify-center gap-3 p-5 text-center">
             <ScoreRing
               score={goalStats.goalTotalScore}
@@ -329,7 +329,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
         <Card>
           <CardHeader>
             <CardTitle as="h2">Upcoming deadlines</CardTitle>

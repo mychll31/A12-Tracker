@@ -1056,6 +1056,9 @@ async function main(): Promise<void> {
         isActive: true,
         joinedAt,
         lastActiveAt: atHour(TODAY, 8),
+        // Seeded members are established, not new signups — without this they
+        // would all be force-redirected into the onboarding wizard on sign-in.
+        onboardedAt: joinedAt,
       },
       update: {
         firstName: person.firstName,
@@ -1064,6 +1067,7 @@ async function main(): Promise<void> {
         joinedAt,
         lastActiveAt: atHour(TODAY, 8),
         isActive: true,
+        onboardedAt: joinedAt,
       },
     });
   }

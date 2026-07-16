@@ -19,10 +19,12 @@ export type TDProps = TdHTMLAttributes<HTMLTableCellElement>;
 export function Table({ className, wrapperClassName, ...props }: TableProps) {
   return (
     // A table row has a floor width; on a phone it must scroll sideways rather
-    // than wrap into an unreadable stack.
+    // than wrap into an unreadable stack. `relative` keeps absolutely-positioned
+    // cell content (e.g. sr-only spans) anchored to this scroll box instead of
+    // <html>, where a far-right column would otherwise stretch the whole page.
     <div
       className={cn(
-        "scroll-thin w-full overflow-x-auto rounded-card border border-border",
+        "scroll-thin relative w-full overflow-x-auto rounded-card border border-border",
         wrapperClassName,
       )}
     >
@@ -66,7 +68,7 @@ export function TH({ className, scope = "col", ...props }: THProps) {
     <th
       scope={scope}
       className={cn(
-        "whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted",
+        "whitespace-nowrap px-3 py-3 text-[0.6875rem] font-semibold uppercase text-muted",
         className,
       )}
       {...props}
@@ -77,7 +79,7 @@ export function TH({ className, scope = "col", ...props }: THProps) {
 export function TD({ className, ...props }: TDProps) {
   return (
     <td
-      className={cn("px-4 py-3 align-middle text-foreground", className)}
+      className={cn("px-3 py-3 align-middle text-foreground", className)}
       {...props}
     />
   );

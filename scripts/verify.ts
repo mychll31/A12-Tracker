@@ -5,9 +5,7 @@
  * re-querying tables, so a broken rule fails loudly here instead of quietly
  * misreporting on a page. Run with: npx tsx scripts/verify.ts
  */
-// tsx does not read .env on its own; `prisma db seed` only gets it via
-// prisma.config.ts. Without this the client cannot find DATABASE_URL.
-import "dotenv/config";
+import "./env";
 
 import { db } from "../src/lib/db";
 import {

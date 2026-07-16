@@ -186,7 +186,7 @@ export default async function MenteesPage({
       {/* A plain GET form: the filter state lives in the URL, so a filtered
           roster is a link a coach can share or bookmark. */}
       <form
-        className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end"
+        className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end [&>*]:min-w-0"
         role="search"
       >
         <div className="flex flex-col gap-1.5">
@@ -262,7 +262,7 @@ export default async function MenteesPage({
                 description="The people below sit in other coaches' groups. You can read them, but not edit them."
               />
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
                 {yours.map((mentee) => (
                   <MenteeGridCard key={mentee.id} mentee={mentee} isMine />
                 ))}
@@ -285,7 +285,7 @@ export default async function MenteesPage({
                 <span className="text-xs text-muted">{others.length}</span>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
                 {others.map((mentee) => (
                   <MenteeGridCard
                     key={mentee.id}

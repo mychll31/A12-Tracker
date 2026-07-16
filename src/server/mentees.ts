@@ -203,8 +203,6 @@ export async function listMentees(
       ...(opts?.groupId
         ? { memberships: { some: { groupId: opts.groupId, isActive: true } } }
         : {}),
-      // SQLite's LIKE is already case-insensitive for ASCII, so Prisma's
-      // `mode: "insensitive"` (unsupported on this provider) is not needed.
       ...(search
         ? {
             OR: [

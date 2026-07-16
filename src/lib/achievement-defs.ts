@@ -6,7 +6,7 @@
  * here — especially a `server-only` guard — would break the seed.
  *
  * `criteria` is a JSON string rather than a nested object because the schema
- * stores it verbatim in `achievements.criteria` (SQLite has no Json scalar).
+ * stores it verbatim in `achievements.criteria`.
  * Every rule is a single `{ metric, gte }` pair, checked against the fields of
  * a computed `UserScore`.
  */

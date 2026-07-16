@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Menu, Sparkles, X } from "lucide-react";
+import { Bell, Menu, X } from "lucide-react";
 
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NavLinks } from "./sidebar";
 import { UserMenu, type UserMenuProps } from "./user-menu";
+import { Wordmark } from "./wordmark";
 import type { NavSection } from "./nav-config";
 
 export function Topbar({
@@ -52,15 +53,7 @@ export function Topbar({
           <Menu className="size-5" />
         </button>
 
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-2 font-semibold tracking-tight lg:hidden"
-        >
-          <span className="grid size-7 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Sparkles className="size-3.5" />
-          </span>
-          Abundance Hub
-        </Link>
+        <Wordmark size="sm" className="lg:hidden" />
 
         <div className="flex-1" />
 
@@ -96,12 +89,7 @@ export function Topbar({
 
           <div className="absolute inset-y-0 left-0 flex w-72 animate-slide-up flex-col border-r border-border bg-surface-raised">
             <div className="flex items-center justify-between px-5 py-5">
-              <span className="flex items-center gap-2 font-semibold tracking-tight">
-                <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-                  <Sparkles className="size-4" />
-                </span>
-                Abundance Hub
-              </span>
+              <Wordmark size="sm" />
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}

@@ -28,27 +28,34 @@ export function scoreTone(score: number): Tone {
   return "critical";
 }
 
+/*
+ * The score palette is the landing page's, not Tailwind's: green, cyan, gold and
+ * rose — the same four hues its "Your Total Score" card uses for 100 / 33.3 / 25.
+ * They resolve through CSS variables (globals.css), so a 72 is the same colour in
+ * a ring, a bar, a badge and a chart, and both themes stay in step on their own.
+ */
 export const TONE_TEXT: Record<Tone, string> = {
-  critical: "text-rose-500 dark:text-rose-400",
-  warning: "text-amber-500 dark:text-amber-400",
-  good: "text-sky-500 dark:text-sky-400",
-  excellent: "text-emerald-500 dark:text-emerald-400",
+  critical: "text-[color:var(--score-critical)]",
+  warning: "text-[color:var(--score-warning)]",
+  good: "text-[color:var(--score-good)]",
+  excellent: "text-[color:var(--score-excellent)]",
 };
 
 export const TONE_BG: Record<Tone, string> = {
-  critical: "bg-rose-500",
-  warning: "bg-amber-500",
-  good: "bg-sky-500",
-  excellent: "bg-emerald-500",
+  critical: "bg-[color:var(--score-critical)]",
+  warning: "bg-[color:var(--score-warning)]",
+  good: "bg-[color:var(--score-good)]",
+  excellent: "bg-[color:var(--score-excellent)]",
 };
 
 export const TONE_SOFT: Record<Tone, string> = {
-  critical: "bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-rose-500/20",
+  critical:
+    "bg-[color:var(--score-critical)]/10 text-[color:var(--score-critical)] ring-[color:var(--score-critical)]/25",
   warning:
-    "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
-  good: "bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20",
+    "bg-[color:var(--score-warning)]/10 text-[color:var(--score-warning)] ring-[color:var(--score-warning)]/25",
+  good: "bg-[color:var(--score-good)]/10 text-[color:var(--score-good)] ring-[color:var(--score-good)]/25",
   excellent:
-    "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
+    "bg-[color:var(--score-excellent)]/10 text-[color:var(--score-excellent)] ring-[color:var(--score-excellent)]/25",
 };
 
 /** Ordinal rank for leaderboards: 1st, 2nd, 3rd, 4th… */

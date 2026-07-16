@@ -120,7 +120,10 @@ export async function signUp(
   });
 
   await createSession(user.id);
-  redirect("/dashboard");
+
+  // A fresh account has onboardedAt = null, so the app shell would bounce them
+  // here regardless. Going straight there saves a pointless round-trip.
+  redirect("/onboarding");
 }
 
 export async function signOut(): Promise<void> {

@@ -5,7 +5,7 @@
  *   npm run dev          # in another terminal
  *   npx tsx scripts/verify-pages.ts
  */
-import "dotenv/config";
+import "./env";
 import { SignJWT } from "jose";
 
 import { db } from "../src/lib/db";

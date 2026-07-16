@@ -9,49 +9,65 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Abundance Hub's surfaces.
+ * Abundance 12.
  *
- * Light is a warm off-white rather than pure #fff — coaches live on these
- * screens for hours, and paper-white glares. Dark is a desaturated slate, not
- * pure black, so the violet accent and the score colours stay legible instead of
- * vibrating against the background.
+ * The application wears the same brand as the landing page: deep navy, gold, and
+ * a cyan that carries the light. Values come from the design bundle
+ * (page-designs/project/Abundance12 Landing.dc.html), so somebody who clicks
+ * "Enter the arena" does not land in a different-looking product.
+ *
+ * Dark is the real theme — the brand was drawn dark, and it is where people
+ * live. Light is a warm parchment counterpart rather than a cold white, so the
+ * gold still reads as gold instead of turning to mustard on a grey field.
  */
 :root {
-  --surface: #f7f7f9;
-  --surface-raised: #ffffff;
-  --surface-sunken: #eeeef2;
-  --border: #e3e3e9;
-  --border-strong: #cfcfd8;
-  --foreground: #17171c;
-  --muted: #6c6c7a;
-  --muted-strong: #4a4a57;
+  --surface: #f6f1e4;
+  --surface-raised: #fffdf7;
+  --surface-sunken: #ece4d1;
+  --border: #ddd3ba;
+  --border-strong: #c6b89a;
+  --foreground: #171c2e;
+  --muted: #5f6478;
+  --muted-strong: #3d4256;
 
-  --primary: #6d4aff;
-  --primary-hover: #5c37f5;
-  --primary-foreground: #ffffff;
-  --primary-soft: #6d4aff14;
+  --primary: #a8791a;
+  --primary-hover: #8f6511;
+  --primary-foreground: #fffdf7;
+  --primary-soft: #a8791a1a;
 
-  --accent: #f59e0b;
-  --ring: #6d4aff;
+  --accent: #1c6fa8;
+  --ring: #a8791a;
+
+  --score-excellent: #17936a;
+  --score-good: #1c6fa8;
+  --score-warning: #a8791a;
+  --score-critical: #c0334f;
 }
 
 .dark {
-  --surface: #0c0c11;
-  --surface-raised: #14141b;
-  --surface-sunken: #08080c;
-  --border: #24242e;
-  --border-strong: #33333f;
-  --foreground: #ececf1;
-  --muted: #8b8b9c;
-  --muted-strong: #a9a9b8;
+  --surface: #080c1c;
+  --surface-raised: #0d1330;
+  --surface-sunken: #060916;
+  --border: #1c2650;
+  --border-strong: #2a336b;
+  --foreground: #f2ecd8;
+  --muted: #9fa8c9;
+  --muted-strong: #c3c9df;
 
-  --primary: #8b6cff;
-  --primary-hover: #9b81ff;
-  --primary-foreground: #0c0c11;
-  --primary-soft: #8b6cff1f;
+  /* Gold is the call to action, so its foreground has to be ink, never white. */
+  --primary: #eab73f;
+  --primary-hover: #f6d067;
+  --primary-foreground: #1a1103;
+  --primary-soft: #eab73f1f;
 
-  --accent: #fbbf24;
-  --ring: #8b6cff;
+  --accent: #58c8ff;
+  --ring: #eab73f;
+
+  /* The four score colours, straight off the landing's own score card. */
+  --score-excellent: #5ee6a8;
+  --score-good: #58c8ff;
+  --score-warning: #eab73f;
+  --score-critical: #f0607a;
 }
 
 @theme inline {
@@ -72,7 +88,13 @@
   --color-accent: var(--accent);
   --color-ring: var(--ring);
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --color-score-excellent: var(--score-excellent);
+  --color-score-good: var(--score-good);
+  --color-score-warning: var(--score-warning);
+  --color-score-critical: var(--score-critical);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-cinzel), serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
   --radius-card: 0.875rem;
@@ -113,6 +135,18 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /*
+   * Cinzel carries every heading, exactly as it does on the landing. Applied
+   * here rather than per-component so all ~25 pages inherit it at once, and none
+   * can quietly drift back to the body face.
+   */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: 0.01em;
+  }
+
   /* One focus treatment for the whole app, so a keyboard user sees the same
      affordance no matter which control they land on. */
   :focus-visible {
@@ -133,6 +167,11 @@
 }
 
 @layer utilities {
+  /* The display face, for the numbers that are the whole point: scores and ranks. */
+  .font-display {
+    font-family: var(--font-display);
+  }
+
   .card-shadow {
     box-shadow:
       0 1px 2px 0 rgb(0 0 0 / 0.04),
@@ -141,8 +180,8 @@
 
   .dark .card-shadow {
     box-shadow:
-      0 1px 2px 0 rgb(0 0 0 / 0.3),
-      0 1px 6px -1px rgb(0 0 0 / 0.2);
+      0 1px 2px 0 rgb(0 0 0 / 0.4),
+      0 8px 24px -12px rgb(0 0 0 / 0.5);
   }
 
   /* Scrollable panels — leaderboards, activity feeds — keep a thin, quiet bar. */

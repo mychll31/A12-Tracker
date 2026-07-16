@@ -1,10 +1,8 @@
 // Abundance Hub — data model
 //
-// Provider note: SQLite is used so the app runs with zero external setup.
-// The schema deliberately avoids Prisma `enum` and `Json` scalars (unsupported
-// on SQLite) so it ports to PostgreSQL by changing only the datasource block
-// and the driver adapter. Status/category codes are stored as TEXT and are
-// type-narrowed in `src/lib/domain.ts`.
+// Provider note: PostgreSQL is used for hosted deployments such as Vercel.
+// Status/category codes are stored as TEXT and are type-narrowed in
+// `src/lib/domain.ts`.
 
 generator client {
   provider = "prisma-client"
@@ -12,6 +10,9 @@ generator client {
 }
 
 // Prisma 7: the connection URL lives in prisma.config.ts, not here.
+// The model deliberately avoids Prisma `enum` and `Json` scalars so status and
+// category codes stay as TEXT and are narrowed back into union types in
+// src/lib/domain.ts.
 datasource db {
   provider = "sqlite"
 }
@@ -50,6 +51,9 @@ model User {
   isActive       Boolean   @default(true)
   joinedAt       DateTime  @default(now())
   lastActiveAt   DateTime?
+  /// When the onboarding wizard was finished. Null means it is still owed, which
+  /// is what /onboarding checks before letting someone into the app proper.
+  onboardedAt    DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -623,3 +627,4 @@ model Attachment {
   @@index([checkInId])
   @@map("attachments")
 }
+

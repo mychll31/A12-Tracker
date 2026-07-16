@@ -2,7 +2,17 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const SESSION_COOKIE = "ah_session";
 
-const PUBLIC_PATHS = ["/login", "/register"];
+/** Prefix-matched: /login, /register, and anything beneath them. */
+const PUBLIC_PREFIXES = ["/login", "/register"];
+
+/**
+ * Exact-matched, and it has to be.
+ *
+ * `/` is the marketing landing page and must be reachable by anyone — but it
+ * cannot join the prefix list, because *every* path begins with "/" and the
+ * entire application would silently become public.
+ */
+const PUBLIC_EXACT = ["/"];
 
 /**
  * An optimistic gate, not the security boundary.
@@ -17,7 +27,10 @@ const PUBLIC_PATHS = ["/login", "/register"];
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasSession = request.cookies.has(SESSION_COOKIE);
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+
+  const isLanding = PUBLIC_EXACT.includes(pathname);
+  const isAuthPage = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
+  const isPublic = isLanding || isAuthPage;
 
   if (!hasSession && !isPublic) {
     const url = request.nextUrl.clone();
@@ -27,7 +40,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (hasSession && isPublic) {
+  // A signed-in visitor has no use for the sign-in form — but they may well want
+  // to look at the landing page, so only the auth pages bounce.
+  if (hasSession && isAuthPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     url.search = "";

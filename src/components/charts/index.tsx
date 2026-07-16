@@ -30,13 +30,17 @@ import { cn } from "@/lib/utils";
  * src/lib/utils.ts — a 72 is the same colour in a ring, a badge and a line.
  */
 const COLORS = {
-  primary: "#8b6cff",
-  emerald: "#10b981",
-  amber: "#f59e0b",
-  sky: "#0ea5e9",
-  rose: "#f43f5e",
-  grid: "rgba(128,128,140,0.16)",
-  axis: "#8b8b9c",
+  primary: "#eab73f", // gold — the overall score, the headline series
+  emerald: "#5ee6a8", // the same green the landing scores a 100 with
+  amber: "#eab73f", // warning threshold on the bar charts
+  sky: "#58c8ff",
+  rose: "#f0607a",
+  // Consistency needs a hue of its own: it cannot share gold with Overall, or the
+  // two lines on the score-trend chart become one indistinguishable line. This
+  // violet is already in the palette — it is in the landing's avatar gradients.
+  violet: "#8b6cff",
+  grid: "rgba(159,168,201,0.14)",
+  axis: "#9fa8c9",
 } as const;
 
 const AXIS = {
@@ -163,7 +167,7 @@ export function ScoreTrendChart({
           type="monotone"
           dataKey="consistency"
           name="Consistency"
-          stroke={COLORS.amber}
+          stroke={COLORS.violet}
           strokeWidth={1.5}
           dot={false}
         />

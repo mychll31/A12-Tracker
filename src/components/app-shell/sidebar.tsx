@@ -16,7 +16,6 @@ import {
   Network,
   NotebookPen,
   Shield,
-  Sparkles,
   Target,
   TrendingUp,
   Trophy,
@@ -24,6 +23,8 @@ import {
   Users,
   UsersRound,
 } from "lucide-react";
+
+import { Wordmark } from "./wordmark";
 
 import { cn } from "@/lib/utils";
 import { isActive, type NavSection } from "./nav-config";
@@ -114,15 +115,7 @@ export function NavLinks({
 export function Sidebar({ sections }: { sections: NavSection[] }) {
   return (
     <aside className="hidden w-64 shrink-0 border-r border-border bg-surface-raised lg:flex lg:flex-col">
-      <Link
-        href="/dashboard"
-        className="flex items-center gap-2 px-6 py-5 text-base font-semibold tracking-tight"
-      >
-        <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-          <Sparkles className="size-4" />
-        </span>
-        Abundance Hub
-      </Link>
+      <Wordmark className="px-6 py-5" />
 
       <div className="flex-1 overflow-y-auto pb-6 scroll-thin">
         <NavLinks sections={sections} />
