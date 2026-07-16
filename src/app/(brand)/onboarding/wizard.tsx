@@ -119,7 +119,7 @@ export function OnboardingWizard({
       : step === 1
         ? "Every realm needs a goal and its first task."
         : step === 4
-          ? "Pick the circle you’ll climb with."
+          ? "Pick the council you’ll climb with."
           : "";
 
   const meta = [
@@ -149,8 +149,8 @@ export function OnboardingWizard({
     },
     {
       eyebrow: "Community",
-      title: "Join a circle",
-      subtitle: "Legends are not made alone. Pick the group you’ll climb with.",
+      title: "Join a council",
+      subtitle: "Legends are not made alone. Pick the council you’ll climb with.",
     },
   ][step];
 
@@ -694,7 +694,7 @@ export function OnboardingWizard({
                       </div>
                     ) : null}
                     <p style={hintStyle}>
-                      Your coach has already placed you in this circle — you are
+                      Your coach has already placed you in this council — you are
                       in. Nothing to choose here.
                     </p>
                   </>

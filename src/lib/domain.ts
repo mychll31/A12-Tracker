@@ -54,6 +54,35 @@ export const OPEN_GOAL_STATUSES: GoalStatus[] = [
   "AT_RISK",
 ];
 
+/** Whether the goal's measured metric is being grown or reduced. */
+export const GOAL_DIRECTIONS = ["GAIN", "LOSE"] as const;
+export type GoalDirection = (typeof GOAL_DIRECTIONS)[number];
+
+/** An action plan's state. */
+export const ACTION_PLAN_STATUSES = [
+  "NOT_STARTED",
+  "IN_PROGRESS",
+  "DONE",
+] as const;
+export type ActionPlanStatus = (typeof ACTION_PLAN_STATUSES)[number];
+
+export const ACTION_PLAN_STATUS_LABELS: Record<ActionPlanStatus, string> = {
+  NOT_STARTED: "Not started",
+  IN_PROGRESS: "In progress",
+  DONE: "Done",
+};
+
+/**
+ * How much each status counts toward a goal's *informational* action-plan
+ * completion figure. This is shown next to a goal but never folded into the
+ * goal score, which is the numeric measure alone.
+ */
+export const PLAN_STATUS_WEIGHT: Record<ActionPlanStatus, number> = {
+  NOT_STARTED: 0,
+  IN_PROGRESS: 50,
+  DONE: 100,
+};
+
 // ---------------------------------------------------------------------------
 // Scoring
 // ---------------------------------------------------------------------------

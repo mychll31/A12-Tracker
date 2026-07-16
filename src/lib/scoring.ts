@@ -72,40 +72,36 @@ const clamp = (n: number, lo = 0, hi = 100) => Math.min(hi, Math.max(lo, n));
 // Goal scoring
 // ---------------------------------------------------------------------------
 
-export type GoalTaskLike = { isComplete: boolean; weight: number };
-
 export type ScorableGoal = {
   status: string;
   progress: number;
   categoryKey: string;
-  tasks: GoalTaskLike[];
+  /** The measurable target and how far toward it the owner has come. */
+  targetValue: number;
+  currentValue: number;
 };
 
 /**
- * Every goal carries a score on 0-100, and it comes from the goal's to-do list:
- * the weighted share of its tasks that are done. A goal is exactly as far along
- * as the work inside it.
+ * Every goal carries a score on 0-100, and it is its **numeric measure**: how
+ * far the current value has come toward the target (`current ÷ target`). Whether
+ * the metric is being gained or lost is only a label — a goal is exactly as far
+ * along as its number says.
  *
  * Two overrides, and a fallback:
- *   COMPLETED  — always 100. Somebody who finishes the goal without ticking the
- *                last box has still finished the goal.
+ *   COMPLETED  — always 100. Finishing the goal is finishing it, target or not.
  *   ABANDONED  — null, i.e. withdrawn from the average rather than scored zero.
  *                If dropping a goal you have outgrown permanently damaged your
  *                score, nobody would ever drop one honestly.
- *   no tasks   — falls back to the goal's own progress field, so a goal without
- *                a to-do list still scores rather than reading as zero.
+ *   no target  — falls back to the goal's own progress field, so a goal without
+ *                a measure set still scores rather than reading as zero.
  */
 export function scoreGoal(goal: ScorableGoal): number | null {
   const status = asGoalStatus(goal.status);
   if (status === "ABANDONED") return null;
   if (status === "COMPLETED") return 100;
 
-  if (goal.tasks.length > 0) {
-    const total = goal.tasks.reduce((sum, t) => sum + Math.max(1, t.weight), 0);
-    const done = goal.tasks
-      .filter((t) => t.isComplete)
-      .reduce((sum, t) => sum + Math.max(1, t.weight), 0);
-    return total ? round((done / total) * 100) : 0;
+  if (goal.targetValue > 0) {
+    return round(clamp((goal.currentValue / goal.targetValue) * 100));
   }
 
   return clamp(goal.progress);
@@ -227,9 +223,10 @@ export async function computeScoresForUsers(
         status: true,
         progress: true,
         category: { select: { key: true } },
-        // A goal's score is the weighted share of its to-do list that is done,
-        // so the tasks come along with the goal rather than in a second pass.
-        tasks: { select: { isComplete: true, weight: true } },
+        // A goal's score is its numeric measure — how far current has come
+        // toward target.
+        targetValue: true,
+        currentValue: true,
       },
     }),
     db.coreTaskCompletion.findMany({
@@ -268,7 +265,8 @@ export async function computeScoresForUsers(
       status: g.status,
       progress: g.progress,
       categoryKey: g.category.key,
-      tasks: g.tasks,
+      targetValue: g.targetValue,
+      currentValue: g.currentValue,
     });
     goalsBy.set(g.userId, list);
   }

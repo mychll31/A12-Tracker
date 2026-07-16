@@ -46,7 +46,7 @@ export function NewGroupButton() {
 
       if (result.ok) {
         toast({
-          title: "Group created",
+          title: "Council created",
           description: "You lead it — start placing mentees into it.",
           variant: "success",
         });
@@ -61,14 +61,14 @@ export function NewGroupButton() {
   return (
     <>
       <Button icon={<Plus />} onClick={() => setOpen(true)}>
-        New group
+        New council
       </Button>
 
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="New coaching group"
-        description="You will lead this group. A coach may only create groups they run themselves."
+        title="New council"
+        description="You will lead this council. A coach may only create councils they run themselves."
         footer={
           <>
             <Button
@@ -79,7 +79,7 @@ export function NewGroupButton() {
               Cancel
             </Button>
             <Button type="submit" form={formId} isLoading={pending}>
-              Create group
+              Create council
             </Button>
           </>
         }
@@ -91,7 +91,7 @@ export function NewGroupButton() {
 
           <FormField
             label="Description"
-            hint="What this group is for. Optional."
+            hint="What this council is for. Optional."
           >
             <Textarea
               name="description"
@@ -127,7 +127,7 @@ export function AddMenteeButton({
       if (result.ok) {
         toast({
           title: "Mentee added",
-          description: "They now sit in this group.",
+          description: "They now sit in this council.",
           variant: "success",
         });
         setOpen(false);
@@ -152,8 +152,8 @@ export function AddMenteeButton({
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Add a mentee to this group"
-        description="A mentee belongs to one group at a time — adding them here moves them out of any group they are currently in."
+        title="Add a mentee to this council"
+        description="A mentee belongs to one council at a time — adding them here moves them out of any council they are currently in."
         footer={
           <>
             <Button
@@ -169,7 +169,7 @@ export function AddMenteeButton({
               isLoading={pending}
               disabled={candidates.length === 0}
             >
-              Add to group
+              Add to council
             </Button>
           </>
         }
@@ -179,7 +179,7 @@ export function AddMenteeButton({
 
           {candidates.length === 0 ? (
             <p className="text-sm text-muted">
-              Every mentee in the organization is already in this group.
+              Every mentee in the organization is already in this council.
             </p>
           ) : (
             <FormField label="Mentee" required>

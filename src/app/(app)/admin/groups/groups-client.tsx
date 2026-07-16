@@ -98,7 +98,7 @@ export function GroupsClient({
       <section className="flex flex-col gap-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted">
-            A mentee belongs to exactly one coaching group. Moving them into a
+            A mentee belongs to exactly one council. Moving them into a
             new one closes the old membership.
           </p>
 
@@ -114,7 +114,7 @@ export function GroupsClient({
               icon={<Plus />}
               onClick={() => setDialog({ kind: "create-group" })}
             >
-              New group
+              New council
             </Button>
           </div>
         </div>
@@ -122,14 +122,14 @@ export function GroupsClient({
         {groups.length === 0 ? (
           <EmptyState
             icon={Network}
-            title="No coaching groups yet"
-            description="A group is a coach and the mentees they lead. Create the first one to start placing members."
+            title="No councils yet"
+            description="A council is a coach and the mentees they lead. Create the first one to start placing members."
             action={
               <Button
                 icon={<Plus />}
                 onClick={() => setDialog({ kind: "create-group" })}
               >
-                New group
+                New council
               </Button>
             }
           />
@@ -198,7 +198,7 @@ export function GroupsClient({
 
                   {group.members.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-border bg-surface-sunken px-3 py-4 text-center text-xs text-muted">
-                      No mentees in this group yet.
+                      No mentees in this council yet.
                     </p>
                   ) : (
                     <ul className="flex flex-col gap-1">
@@ -215,7 +215,7 @@ export function GroupsClient({
                             title="Remove member"
                             label="Remove"
                             fields={{ menteeId: member.id, groupId: group.id }}
-                            confirm={`Remove ${member.name} from ${group.name}? They will be left without a coaching group.`}
+                            confirm={`Remove ${member.name} from ${group.name}? They will be left without a council.`}
                           />
                         </li>
                       ))}
@@ -327,12 +327,12 @@ export function GroupsClient({
       <Modal
         open={dialog?.kind === "create-group"}
         onClose={close}
-        title="New coaching group"
-        description="Pick the coach who will lead it. Mentees are placed into the group afterwards."
+        title="New council"
+        description="Pick the coach who will lead it. Mentees are placed into the council afterwards."
       >
         <ActionForm
           action={createGroupAction}
-          submitLabel="Create group"
+          submitLabel="Create council"
           onSuccess={close}
           onCancel={close}
         >
@@ -356,7 +356,7 @@ export function GroupsClient({
               <Textarea
                 name="description"
                 rows={3}
-                placeholder="What this group is working toward."
+                placeholder="What this council is working toward."
               />
             </FormField>
           </div>
@@ -366,13 +366,13 @@ export function GroupsClient({
       <Modal
         open={dialog?.kind === "edit-group"}
         onClose={close}
-        title="Edit group"
-        description="Archiving a group leaves its members without an active coaching group."
+        title="Edit council"
+        description="Archiving a council leaves its members without an active council."
       >
         {dialog?.kind === "edit-group" ? (
           <ActionForm
             action={updateGroupAction}
-            submitLabel="Save group"
+            submitLabel="Save council"
             onSuccess={close}
             onCancel={close}
           >
@@ -411,8 +411,8 @@ export function GroupsClient({
       <Modal
         open={dialog?.kind === "assign"}
         onClose={close}
-        title="Assign a mentee to a group"
-        description="This MOVES the mentee. A mentee belongs to exactly one coaching group, so any group they are currently in is closed out."
+        title="Assign a mentee to a council"
+        description="This MOVES the mentee. A mentee belongs to exactly one council, so any council they are currently in is closed out."
       >
         <ActionForm
           action={assignMenteeAction}
@@ -431,14 +431,14 @@ export function GroupsClient({
 
           <div className="mt-4">
             <FormField
-              label="Group"
+              label="Council"
               required
               hint="Their previous membership is deactivated, not deleted — the history stays."
             >
               <Select
                 name="groupId"
                 options={groupOptions}
-                placeholder="Choose a group"
+                placeholder="Choose a council"
                 required
               />
             </FormField>
@@ -450,7 +450,7 @@ export function GroupsClient({
         open={dialog?.kind === "grant"}
         onClose={close}
         title="Grant a delegation"
-        description="The receiving coach will be able to edit the mentee — or every mentee in the group — as if they were their own."
+        description="The receiving coach will be able to edit the mentee — or every mentee in the council — as if they were their own."
       >
         <ActionForm
           action={grantDelegationAction}
@@ -471,12 +471,12 @@ export function GroupsClient({
             <FormField
               label="Covers"
               required
-              hint="A single mentee, or a whole group."
+              hint="A single mentee, or a whole council."
             >
               <Select
                 name="target"
                 options={delegationTargetOptions}
-                placeholder="Choose a mentee or a group"
+                placeholder="Choose a mentee or a council"
                 required
               />
             </FormField>

@@ -195,7 +195,7 @@ export default async function OrganizationPage() {
             <EmptyState
               icon={Users}
               title="No coaches yet"
-              description="Once a coach leads a group they appear in this comparison."
+              description="Once a coach leads a council they appear in this comparison."
               className="border-0 bg-transparent py-8"
             />
           ) : (
@@ -214,7 +214,7 @@ export default async function OrganizationPage() {
                   <TR className="hover:bg-transparent">
                     <TH>Rank</TH>
                     <TH>Coach</TH>
-                    <TH>Groups</TH>
+                    <TH>Councils</TH>
                     <TH className="text-right">Mentees</TH>
                     <TH className="text-right">Active</TH>
                     <TH className="text-right">Average score</TH>

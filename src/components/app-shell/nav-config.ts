@@ -42,7 +42,7 @@ export function navFor(user: SessionUser): NavSection[] {
       items: [
         { href: "/coach", label: "Coach Dashboard", icon: "compass" },
         { href: "/coach/mentees", label: "Mentees", icon: "users" },
-        { href: "/coach/groups", label: "Groups", icon: "users-round" },
+        { href: "/coach/groups", label: "Councils", icon: "users-round" },
         { href: "/coach/notes", label: "Coaching Notes", icon: "file-text" },
         { href: "/organization", label: "Organization", icon: "building-2" },
       ],
@@ -64,7 +64,7 @@ export function navFor(user: SessionUser): NavSection[] {
       items: [
         { href: "/admin", label: "Overview", icon: "shield" },
         { href: "/admin/users", label: "Users", icon: "user-cog" },
-        { href: "/admin/groups", label: "Coach Groups", icon: "network" },
+        { href: "/admin/groups", label: "Councils", icon: "network" },
         { href: "/admin/core-tasks", label: "Core Tasks", icon: "list-checks" },
       ],
     });

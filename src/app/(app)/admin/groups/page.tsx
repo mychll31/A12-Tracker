@@ -13,7 +13,7 @@ import {
   type GroupView,
 } from "./groups-client";
 
-export const metadata: Metadata = { title: "Coach groups" };
+export const metadata: Metadata = { title: "Councils" };
 
 export default async function AdminGroupsPage() {
   const user = await requireAdmin();
@@ -46,7 +46,7 @@ export default async function AdminGroupsPage() {
     scopeLabel: row.mentee
       ? `Mentee · ${row.mentee.firstName} ${row.mentee.lastName}`
       : row.group
-        ? `Group · ${row.group.name}`
+        ? `Council · ${row.group.name}`
         : "—",
     permission: row.permission,
     expiresLabel: row.expiresAt ? formatDate(row.expiresAt) : "Never",
@@ -83,7 +83,7 @@ export default async function AdminGroupsPage() {
 
   const menteeOptions: SelectOption[] = mentees.map((mentee) => ({
     value: mentee.id,
-    label: `${mentee.firstName} ${mentee.lastName} · ${mentee.groupName ?? "no group"}`,
+    label: `${mentee.firstName} ${mentee.lastName} · ${mentee.groupName ?? "no council"}`,
   }));
 
   const groupOptions: SelectOption[] = groups.map((group) => ({
@@ -98,14 +98,14 @@ export default async function AdminGroupsPage() {
     })),
     ...groups.map((group) => ({
       value: `group:${group.id}`,
-      label: `Group · ${group.name}`,
+      label: `Council · ${group.name}`,
     })),
   ];
 
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Coach groups</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Councils</h1>
         <p className="mt-2 text-sm text-muted">
           Who coaches whom, and who is allowed to step in for whom.
         </p>

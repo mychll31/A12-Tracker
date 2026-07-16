@@ -101,7 +101,7 @@ export default async function DashboardPage() {
             }
           />
           <StatCard
-            label="Group rank"
+            label="Council rank"
             icon={Trophy}
             href="/leaderboards"
             value={

@@ -47,7 +47,7 @@ export function MenteeTable({
   mentees,
   showGroup = true,
   emptyTitle = "No mentees yet",
-  emptyDescription = "Once a mentee joins one of your groups they appear here, with their score and streak.",
+  emptyDescription = "Once a mentee joins one of your councils they appear here, with their score and streak.",
 }: MenteeTableProps) {
   if (mentees.length === 0) {
     return (
@@ -67,7 +67,7 @@ export function MenteeTable({
       <THead>
         <TR className="hover:bg-transparent">
           <TH>Mentee</TH>
-          {showGroup ? <TH>Group</TH> : null}
+          {showGroup ? <TH>Council</TH> : null}
           <TH className="text-right">Score</TH>
           <TH className="text-right">Streak</TH>
           <TH className="text-right">Goals</TH>

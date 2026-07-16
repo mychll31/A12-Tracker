@@ -374,3 +374,58 @@ export async function myGroupMembers(
   const ids = await groupMemberIds(actor.menteeGroupId);
   return cardsForUserIds(ids);
 }
+
+export type CouncilOption = {
+  id: string;
+  name: string;
+  description: string | null;
+  coachName: string;
+  memberCount: number;
+  averageScore: number;
+  /** True for the council the member is in right now. */
+  isCurrent: boolean;
+};
+
+/**
+ * Every active council in the organization — the menu a member picks from when
+ * moving themselves. This is intentionally *not* scoped by `visibleUserIds`
+ * (which would hide every council but their own): choosing where to sit means
+ * seeing the choices.
+ */
+export async function listCouncilsForMember(
+  actor: SessionUser,
+): Promise<CouncilOption[]> {
+  const groups = await db.coachGroup.findMany({
+    where: { organizationId: actor.organizationId, isActive: true },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      coach: { select: { firstName: true, lastName: true } },
+      memberships: { where: { isActive: true }, select: { menteeId: true } },
+    },
+  });
+
+  // One scoring pass across every member of every council.
+  const memberIds = [
+    ...new Set(groups.flatMap((g) => g.memberships.map((m) => m.menteeId))),
+  ];
+  const scores = await computeScoresForUsers(memberIds);
+
+  return groups.map((group) => {
+    const memberScores = group.memberships
+      .map((m) => scores.get(m.menteeId))
+      .filter((s): s is UserScore => Boolean(s));
+
+    return {
+      id: group.id,
+      name: group.name,
+      description: group.description,
+      coachName: `${group.coach.firstName} ${group.coach.lastName}`,
+      memberCount: group.memberships.length,
+      averageScore: averageScore(memberScores),
+      isCurrent: group.id === actor.menteeGroupId,
+    };
+  });
+}

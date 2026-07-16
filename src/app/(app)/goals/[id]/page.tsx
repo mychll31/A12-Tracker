@@ -33,6 +33,7 @@ import { GOAL_CATEGORY_LABELS } from "../categories";
 import { GoalScoreBadge } from "../goal-score-badge";
 import { CommentForm } from "./comment-form";
 import { GoalControls } from "./goal-controls";
+import { MeasureControl } from "./measure-control";
 import { TaskList } from "./task-list";
 
 export const metadata: Metadata = { title: "Goal" };
@@ -101,6 +102,12 @@ export default async function GoalDetailPage({
             </Badge>
             <StatusBadge status={goal.status} />
             <GoalScoreBadge score={goal.score} size="md" />
+            {goal.targetValue > 0 ? (
+              <Badge variant="neutral">
+                {goal.direction === "LOSE" ? "Lose" : "Gain"} {goal.targetValue}
+                {goal.unit ? ` ${goal.unit}` : ""}
+              </Badge>
+            ) : null}
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 text-xs",
@@ -129,6 +136,10 @@ export default async function GoalDetailPage({
             notes: goal.notes,
             status: goal.status,
             targetDate: isoDay(goal.targetDate),
+            direction: goal.direction,
+            targetValue: goal.targetValue,
+            currentValue: goal.currentValue,
+            unit: goal.unit,
           }}
         />
       </header>
@@ -141,29 +152,40 @@ export default async function GoalDetailPage({
               <CardDescription>
                 {goal.score === null
                   ? "This goal is abandoned — withdrawn from your scores rather than counted as a zero."
-                  : "The share of this goal's tasks that are done. Tick one to move it."}
+                  : "How far your current value has come toward the target."}
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
-              {goal.score === null ? (
-                <div className="flex size-[116px] shrink-0 flex-col items-center justify-center gap-1 rounded-full bg-surface-sunken">
-                  <span className="text-3xl font-semibold leading-none text-muted">
-                    —
-                  </span>
-                  <span className="text-[0.6875rem] font-medium text-muted">
-                    Not scored
-                  </span>
-                </div>
-              ) : (
-                <ScoreRing
-                  score={goal.score}
-                  size={116}
-                  label="Goal Score"
-                  sublabel="of 100"
-                />
-              )}
+            <CardContent className="flex flex-col gap-6">
+              <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
+                {goal.score === null ? (
+                  <div className="flex size-[116px] shrink-0 flex-col items-center justify-center gap-1 rounded-full bg-surface-sunken">
+                    <span className="text-3xl font-semibold leading-none text-muted">
+                      —
+                    </span>
+                    <span className="text-[0.6875rem] font-medium text-muted">
+                      Not scored
+                    </span>
+                  </div>
+                ) : (
+                  <ScoreRing
+                    score={goal.score}
+                    size={116}
+                    label="Goal Score"
+                    sublabel="of 100"
+                  />
+                )}
 
-              <dl className="grid flex-1 grid-cols-2 gap-4 text-sm">
+                <MeasureControl
+                  goalId={goal.id}
+                  direction={goal.direction}
+                  targetValue={goal.targetValue}
+                  currentValue={goal.currentValue}
+                  unit={goal.unit}
+                  progress={goal.progress}
+                />
+              </div>
+
+              <dl className="grid grid-cols-2 gap-4 border-t border-border pt-4 text-sm sm:grid-cols-4">
                 <div>
                   <dt className="text-xs text-muted">Started</dt>
                   <dd className="mt-0.5 font-medium">
@@ -171,7 +193,7 @@ export default async function GoalDetailPage({
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-muted">Target</dt>
+                  <dt className="text-xs text-muted">Target date</dt>
                   <dd className="mt-0.5 font-medium">
                     {formatDate(goal.targetDate)}
                   </dd>
@@ -183,16 +205,10 @@ export default async function GoalDetailPage({
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-muted">Tasks done</dt>
+                  <dt className="text-xs text-muted">Action plans</dt>
                   <dd className="mt-0.5 font-medium tabular-nums">
-                    {goal.completedTasks}/{goal.taskCount}
+                    {goal.completedTasks}/{goal.taskCount} done
                   </dd>
-                </div>
-
-                <div className="col-span-2">
-                  {/* The stored progress column mirrors the task-derived score,
-                      so this bar and the ring above can never disagree. */}
-                  <ProgressBar value={goal.progress} label="Progress" />
                 </div>
               </dl>
             </CardContent>
@@ -226,20 +242,20 @@ export default async function GoalDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle as="h2">Tasks</CardTitle>
+              <CardTitle as="h2">Action Plans</CardTitle>
               <CardDescription>
-                {goal.completedTasks}/{goal.taskCount} complete — this to-do list
-                is what the Goal Score is made of.
+                The steps toward this goal. Click a status to move it between not
+                started, in progress and done — shown here, but the score comes
+                from the measure above.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <TaskList
                 goalId={goal.id}
-                tasks={goal.tasks.map((task) => ({
-                  id: task.id,
-                  title: task.title,
-                  isComplete: task.isComplete,
-                  dueDate: task.dueDate,
+                plans={goal.tasks.map((plan) => ({
+                  id: plan.id,
+                  title: plan.title,
+                  status: plan.status,
                 }))}
               />
             </CardContent>

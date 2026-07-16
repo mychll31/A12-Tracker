@@ -8,7 +8,11 @@ import type { ButtonSize, ButtonVariant } from "@/components/ui/button";
 import { FormField, Input, Label, Textarea } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
-import { GOAL_CATEGORY_KEYS, type GoalCategoryKey } from "@/lib/domain";
+import {
+  GOAL_CATEGORY_KEYS,
+  GOAL_DIRECTIONS,
+  type GoalCategoryKey,
+} from "@/lib/domain";
 
 import { createGoalAction } from "./actions";
 import { initialGoalState } from "../_lib/form-state";
@@ -17,6 +21,11 @@ import { GOAL_CATEGORY_LABELS } from "./categories";
 const CATEGORY_OPTIONS = GOAL_CATEGORY_KEYS.map((key) => ({
   value: key,
   label: GOAL_CATEGORY_LABELS[key],
+}));
+
+const DIRECTION_OPTIONS = GOAL_DIRECTIONS.map((key) => ({
+  value: key,
+  label: key === "LOSE" ? "Lose" : "Gain",
 }));
 
 export interface NewGoalDialogProps {
@@ -46,11 +55,8 @@ export function NewGoalDialog({
     );
   }
 
-  // A goal's score IS the share of its tasks that are done, so a goal with no
-  // tasks could never score above zero. The server refuses one; the form refuses
-  // to let you get that far.
+  // Action plans are optional — a goal is scored by its measure, not its plans.
   const filled = tasks.filter((task) => task.trim().length > 0).length;
-  const canSubmit = filled > 0;
 
   return (
     <>
@@ -107,17 +113,49 @@ export function NewGoalDialog({
             </FormField>
           </div>
 
+          <div className="grid gap-5 sm:grid-cols-2">
+            <FormField label="Direction" required>
+              <Select
+                name="direction"
+                options={DIRECTION_OPTIONS}
+                defaultValue="GAIN"
+              />
+            </FormField>
+            <FormField label="Unit" hint="e.g. Kg, M, books">
+              <Input name="unit" maxLength={20} placeholder="Kg" />
+            </FormField>
+            <FormField label="Target value" required hint="The number you're aiming for.">
+              <Input
+                name="targetValue"
+                type="number"
+                min={0}
+                step="any"
+                placeholder="10"
+                required
+              />
+            </FormField>
+            <FormField label="Current value" hint="Where you are now.">
+              <Input
+                name="currentValue"
+                type="number"
+                min={0}
+                step="any"
+                placeholder="0"
+              />
+            </FormField>
+          </div>
+
           <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface-sunken p-4">
             <div className="flex items-center gap-2">
               <ListTodo className="size-4 text-muted" aria-hidden="true" />
-              <Label required>Tasks</Label>
+              <Label>Action plans</Label>
               <span className="ml-auto text-xs tabular-nums text-muted">
-                {filled} {filled === 1 ? "task" : "tasks"}
+                {filled} {filled === 1 ? "plan" : "plans"}
               </span>
             </div>
             <p className="text-xs leading-relaxed text-muted">
-              A goal is scored by the work inside it — add at least one task.
-              Ticking these off is what moves this goal&apos;s score.
+              Optional — the steps you&apos;ll take. The score comes from the
+              measure above; these just track the work.
             </p>
 
             <ul className="mt-1 flex flex-col gap-2">
@@ -181,11 +219,6 @@ export function NewGoalDialog({
           ) : null}
 
           <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
-            {!canSubmit ? (
-              <p className="mr-auto text-xs text-muted">
-                Add a task to continue — a goal is scored by the work inside it.
-              </p>
-            ) : null}
             <Button
               variant="ghost"
               onClick={() => setOpen(false)}
@@ -193,7 +226,7 @@ export function NewGoalDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" isLoading={pending} disabled={!canSubmit}>
+            <Button type="submit" isLoading={pending}>
               Create goal
             </Button>
           </div>

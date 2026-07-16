@@ -177,7 +177,7 @@ export default async function LeaderboardsPage({
           <EmptyState
             icon={Trophy}
             title="No leaderboards yet"
-            description="You'll be ranked against your coaching group as soon as a coach places you in one."
+            description="You'll be ranked against your council as soon as a coach places you in one."
           />
         </div>
       </div>

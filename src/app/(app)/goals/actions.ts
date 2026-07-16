@@ -5,14 +5,21 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireUser } from "@/lib/auth";
-import { GOAL_CATEGORY_KEYS, GOAL_STATUSES } from "@/lib/domain";
+import {
+  ACTION_PLAN_STATUSES,
+  GOAL_CATEGORY_KEYS,
+  GOAL_DIRECTIONS,
+  GOAL_STATUSES,
+} from "@/lib/domain";
 import { ForbiddenError } from "@/lib/rbac";
 import {
+  addActionPlan,
   addGoalComment,
-  addGoalTask,
   createGoal,
+  deleteActionPlan,
   deleteGoal,
-  toggleGoalTask,
+  setActionPlanStatus,
+  setGoalMeasure,
   updateGoal,
 } from "@/server/goals";
 
@@ -39,29 +46,29 @@ function asFormError(error: unknown): GoalFormState {
   throw error;
 }
 
-/**
- * A goal is scored by the weighted share of its tasks that are done, so a goal
- * with no tasks could only ever score zero. `createGoal` throws a ForbiddenError
- * on an empty list; this rejects it first, with the same message.
- */
-const taskList = z
-  .array(z.string())
-  .transform((values) =>
-    values.map((value) => value.trim()).filter((value) => value.length > 0),
-  )
-  .refine((values) => values.length > 0, {
-    message:
-      "Add at least one task to this goal — a goal is scored by the work inside it.",
-  });
+const measureField = z.coerce.number().min(0).max(1_000_000_000).default(0);
 
 const createSchema = z.object({
   userId: z.string().min(1).optional(),
   title: z.string().min(3, "Give the goal a title of at least 3 characters."),
   description: optionalText,
   categoryKey: z.enum(GOAL_CATEGORY_KEYS),
+  direction: z.enum(GOAL_DIRECTIONS).default("GAIN"),
+  targetValue: measureField,
+  currentValue: measureField,
+  unit: z
+    .string()
+    .max(20)
+    .optional()
+    .transform((value) => (value ? value.trim() : "")),
   targetDate: dayField,
   notes: optionalText,
-  tasks: taskList,
+  // Action plans are optional — a goal is scored by its measure, not its plans.
+  plans: z
+    .array(z.string())
+    .transform((values) =>
+      values.map((value) => value.trim()).filter((value) => value.length > 0),
+    ),
 });
 
 export async function createGoalAction(
@@ -75,9 +82,13 @@ export async function createGoalAction(
     title: formData.get("title"),
     description: formData.get("description") ?? undefined,
     categoryKey: formData.get("categoryKey"),
+    direction: formData.get("direction") ?? "GAIN",
+    targetValue: formData.get("targetValue") ?? 0,
+    currentValue: formData.get("currentValue") ?? 0,
+    unit: formData.get("unit") ?? undefined,
     targetDate: formData.get("targetDate"),
     notes: formData.get("notes") ?? undefined,
-    tasks: formData.getAll("task").map((value) => String(value)),
+    plans: formData.getAll("task").map((value) => String(value)),
   });
 
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -97,11 +108,13 @@ export async function createGoalAction(
       description: parsed.data.description,
       targetDate: parsed.data.targetDate,
       notes: parsed.data.notes,
-      tasks: parsed.data.tasks,
+      direction: parsed.data.direction,
+      targetValue: parsed.data.targetValue,
+      currentValue: parsed.data.currentValue,
+      unit: parsed.data.unit,
+      tasks: parsed.data.plans,
     });
   } catch (error) {
-    // Includes the ForbiddenError createGoal throws when the task list is empty —
-    // surfaced as a form message, never a 500.
     return asFormError(error);
   }
 
@@ -115,6 +128,14 @@ const updateSchema = z.object({
   title: z.string().min(3, "Give the goal a title of at least 3 characters."),
   description: optionalText,
   status: z.enum(GOAL_STATUSES),
+  direction: z.enum(GOAL_DIRECTIONS).default("GAIN"),
+  targetValue: measureField,
+  currentValue: measureField,
+  unit: z
+    .string()
+    .max(20)
+    .optional()
+    .transform((value) => (value ? value.trim() : "")),
   targetDate: dayField,
   notes: optionalText,
 });
@@ -130,6 +151,10 @@ export async function updateGoalAction(
     title: formData.get("title"),
     description: formData.get("description") ?? undefined,
     status: formData.get("status"),
+    direction: formData.get("direction") ?? "GAIN",
+    targetValue: formData.get("targetValue") ?? 0,
+    currentValue: formData.get("currentValue") ?? 0,
+    unit: formData.get("unit") ?? undefined,
     targetDate: formData.get("targetDate"),
     notes: formData.get("notes") ?? undefined,
   });
@@ -141,6 +166,10 @@ export async function updateGoalAction(
       title: parsed.data.title.trim(),
       description: parsed.data.description ?? "",
       status: parsed.data.status,
+      direction: parsed.data.direction,
+      targetValue: parsed.data.targetValue,
+      currentValue: parsed.data.currentValue,
+      unit: parsed.data.unit,
       targetDate: parsed.data.targetDate,
       notes: parsed.data.notes ?? "",
     });
@@ -250,18 +279,18 @@ export async function addCommentAction(
   return { error: null };
 }
 
-const goalTaskSchema = z.object({
+const actionPlanAddSchema = z.object({
   goalId: z.string().min(1),
-  title: z.string().min(1, "Name the task."),
+  title: z.string().min(1, "Name the action plan."),
 });
 
-export async function addGoalTaskAction(
+export async function addActionPlanAction(
   _prev: GoalFormState,
   formData: FormData,
 ): Promise<GoalFormState> {
   const actor = await requireUser();
 
-  const parsed = goalTaskSchema.safeParse({
+  const parsed = actionPlanAddSchema.safeParse({
     goalId: formData.get("goalId"),
     title: formData.get("title"),
   });
@@ -269,29 +298,56 @@ export async function addGoalTaskAction(
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   try {
-    await addGoalTask(actor, parsed.data.goalId, parsed.data.title.trim());
+    await addActionPlan(actor, parsed.data.goalId, parsed.data.title.trim());
   } catch (error) {
     return asFormError(error);
   }
 
-  revalidatePath("/goals");
   revalidatePath(`/goals/${parsed.data.goalId}`);
-  revalidatePath("/dashboard");
-
   return { error: null };
 }
 
-const toggleSchema = z.object({
+const planStatusSchema = z.object({
   goalId: z.string().min(1),
   goalTaskId: z.string().min(1),
+  status: z.enum(ACTION_PLAN_STATUSES),
 });
 
-export async function toggleGoalTaskAction(
+/** Cycles an action plan's status. Never touches the goal score (the measure). */
+export async function setActionPlanStatusAction(
   formData: FormData,
 ): Promise<GoalFormState> {
   const actor = await requireUser();
 
-  const parsed = toggleSchema.safeParse({
+  const parsed = planStatusSchema.safeParse({
+    goalId: formData.get("goalId"),
+    goalTaskId: formData.get("goalTaskId"),
+    status: formData.get("status"),
+  });
+
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  try {
+    await setActionPlanStatus(actor, parsed.data.goalTaskId, parsed.data.status);
+  } catch (error) {
+    return asFormError(error);
+  }
+
+  revalidatePath(`/goals/${parsed.data.goalId}`);
+  return { error: null };
+}
+
+const planIdSchema = z.object({
+  goalId: z.string().min(1),
+  goalTaskId: z.string().min(1),
+});
+
+export async function deleteActionPlanAction(
+  formData: FormData,
+): Promise<GoalFormState> {
+  const actor = await requireUser();
+
+  const parsed = planIdSchema.safeParse({
     goalId: formData.get("goalId"),
     goalTaskId: formData.get("goalTaskId"),
   });
@@ -299,9 +355,35 @@ export async function toggleGoalTaskAction(
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   try {
-    // Progress is derived server-side from the task list — the client never
-    // sends a percentage.
-    await toggleGoalTask(actor, parsed.data.goalTaskId);
+    await deleteActionPlan(actor, parsed.data.goalTaskId);
+  } catch (error) {
+    return asFormError(error);
+  }
+
+  revalidatePath(`/goals/${parsed.data.goalId}`);
+  return { error: null };
+}
+
+const measureSchema = z.object({
+  goalId: z.string().min(1),
+  currentValue: z.coerce.number().min(0).max(1_000_000_000),
+});
+
+/** Updates the goal's "current" measure — this is what moves the goal score. */
+export async function setMeasureAction(
+  formData: FormData,
+): Promise<GoalFormState> {
+  const actor = await requireUser();
+
+  const parsed = measureSchema.safeParse({
+    goalId: formData.get("goalId"),
+    currentValue: formData.get("currentValue"),
+  });
+
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  try {
+    await setGoalMeasure(actor, parsed.data.goalId, parsed.data.currentValue);
   } catch (error) {
     return asFormError(error);
   }
@@ -309,6 +391,5 @@ export async function toggleGoalTaskAction(
   revalidatePath("/goals");
   revalidatePath(`/goals/${parsed.data.goalId}`);
   revalidatePath("/dashboard");
-
   return { error: null };
 }

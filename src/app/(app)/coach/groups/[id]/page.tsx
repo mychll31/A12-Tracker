@@ -23,7 +23,7 @@ import { AreaTrendChart } from "@/components/charts";
 import { MenteeTable } from "../../mentee-table";
 import { AddMenteeButton } from "../group-actions";
 
-export const metadata: Metadata = { title: "Coaching Group" };
+export const metadata: Metadata = { title: "Council" };
 
 const TREND_DAYS = 30;
 
@@ -43,14 +43,14 @@ export default async function GroupDetailPage({
       return (
         <EmptyState
           icon={ShieldAlert}
-          title="You cannot open this group"
+          title="You cannot open this council"
           description={error.message}
           action={
             <Link
               href="/coach/groups"
               className="text-sm font-medium text-primary hover:underline"
             >
-              Back to groups
+              Back to councils
             </Link>
           }
         />
@@ -85,7 +85,7 @@ export default async function GroupDetailPage({
           href="/coach/groups"
           className="w-fit text-xs text-muted hover:text-foreground"
         >
-          ← All groups
+          ← All councils
         </Link>
 
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -94,7 +94,7 @@ export default async function GroupDetailPage({
               {group.name}
             </h1>
             <p className="mt-1 text-sm text-muted">
-              {group.description ?? "No description for this group."}
+              {group.description ?? "No description for this council."}
             </p>
 
             <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted">
@@ -130,8 +130,8 @@ export default async function GroupDetailPage({
           {trend.length === 0 ? (
             <EmptyState
               icon={TrendingUp}
-              title="No group history yet"
-              description="A group's average score is captured daily. The curve appears once the first snapshot lands."
+              title="No council history yet"
+              description="A council's average score is captured daily. The curve appears once the first snapshot lands."
               className="border-0 bg-transparent"
             />
           ) : (
@@ -139,7 +139,7 @@ export default async function GroupDetailPage({
               data={trend}
               dataKey="averageScore"
               label="Average score"
-              title="Group score, last 30 days"
+              title="Council score, last 30 days"
               description="The average of every member's overall score."
               height={240}
             />
@@ -151,7 +151,7 @@ export default async function GroupDetailPage({
         <CardHeader>
           <CardTitle as="h2">Members</CardTitle>
           <CardDescription>
-            Everyone currently in this group, strongest first.
+            Everyone currently in this council, strongest first.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -161,8 +161,8 @@ export default async function GroupDetailPage({
             emptyTitle="No members yet"
             emptyDescription={
               canManage
-                ? "Add a mentee to this group and they will appear here."
-                : "This group has no members yet."
+                ? "Add a mentee to this council and they will appear here."
+                : "This council has no members yet."
             }
           />
         </CardContent>
@@ -172,7 +172,7 @@ export default async function GroupDetailPage({
         <CardHeader>
           <CardTitle as="h2" className="flex items-center gap-2">
             <Trophy className="size-4 text-muted" aria-hidden="true" />
-            Group leaderboard
+            Council leaderboard
           </CardTitle>
           <CardDescription>
             Ranked on overall score. A delta is movement against the last

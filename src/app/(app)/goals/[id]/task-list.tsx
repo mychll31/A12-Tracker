@@ -1,62 +1,77 @@
 "use client";
 
-import { useActionState, useOptimistic, useTransition } from "react";
-import { AlertCircle, Check, Plus } from "lucide-react";
+import { useActionState, useTransition } from "react";
+import {
+  AlertCircle,
+  CircleCheck,
+  CircleDashed,
+  CircleDot,
+  Plus,
+  X,
+} from "lucide-react";
+import type { ComponentType } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
-import { formatDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
+import {
+  ACTION_PLAN_STATUS_LABELS,
+  type ActionPlanStatus,
+} from "@/lib/domain";
 
-import { addGoalTaskAction, toggleGoalTaskAction } from "../actions";
+import {
+  addActionPlanAction,
+  deleteActionPlanAction,
+  setActionPlanStatusAction,
+} from "../actions";
 import { initialGoalState } from "../../_lib/form-state";
 
-export type TaskItem = {
+export type PlanItem = {
   id: string;
   title: string;
-  isComplete: boolean;
-  dueDate: Date | null;
+  status: ActionPlanStatus;
+};
+
+const NEXT: Record<ActionPlanStatus, ActionPlanStatus> = {
+  NOT_STARTED: "IN_PROGRESS",
+  IN_PROGRESS: "DONE",
+  DONE: "NOT_STARTED",
+};
+
+const STATUS_STYLE: Record<
+  ActionPlanStatus,
+  { icon: ComponentType<{ className?: string }>; className: string }
+> = {
+  NOT_STARTED: { icon: CircleDashed, className: "text-muted" },
+  IN_PROGRESS: { icon: CircleDot, className: "text-amber-500" },
+  DONE: { icon: CircleCheck, className: "text-emerald-500" },
 };
 
 export function TaskList({
   goalId,
-  tasks,
+  plans,
 }: {
   goalId: string;
-  tasks: TaskItem[];
+  plans: PlanItem[];
 }) {
   const { toast } = useToast();
   const [, startTransition] = useTransition();
   const [state, formAction, pending] = useActionState(
-    addGoalTaskAction,
+    addActionPlanAction,
     initialGoalState,
   );
 
-  const [optimistic, applyOptimistic] = useOptimistic(
-    tasks,
-    (current, goalTaskId: string) =>
-      current.map((item) =>
-        item.id === goalTaskId
-          ? { ...item, isComplete: !item.isComplete }
-          : item,
-      ),
-  );
-
-  function onToggle(task: TaskItem) {
+  function cycleStatus(plan: PlanItem) {
     startTransition(async () => {
-      // A refused write never revalidates, so the tick unwinds when the
-      // transition settles.
-      applyOptimistic(task.id);
-
       const body = new FormData();
       body.set("goalId", goalId);
-      body.set("goalTaskId", task.id);
-
-      const result = await toggleGoalTaskAction(body);
+      body.set("goalTaskId", plan.id);
+      body.set("status", NEXT[plan.status]);
+      const result = await setActionPlanStatusAction(body);
       if (result.error) {
         toast({
-          title: "Could not update that task",
+          title: "Could not update that plan",
           description: result.error,
           variant: "danger",
         });
@@ -64,82 +79,72 @@ export function TaskList({
     });
   }
 
-  const done = optimistic.filter((m) => m.isComplete).length;
+  function remove(plan: PlanItem) {
+    startTransition(async () => {
+      const body = new FormData();
+      body.set("goalId", goalId);
+      body.set("goalTaskId", plan.id);
+      const result = await deleteActionPlanAction(body);
+      if (result.error) {
+        toast({
+          title: "Could not remove that plan",
+          description: result.error,
+          variant: "danger",
+        });
+      }
+    });
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      {optimistic.length ? (
-        <>
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-sm font-semibold tabular-nums">
-              {done}/{optimistic.length} complete
-            </p>
-            {/* The tick is the only thing that moves the score: toggleGoalTask
-                re-derives it server-side from this list. */}
-            <p className="text-xs text-muted">
-              Ticking a task is what moves this goal&apos;s score.
-            </p>
-          </div>
-
-          <ul className="flex flex-col gap-2">
-            {optimistic.map((task) => (
-              <li key={task.id}>
-                <label
+      {plans.length ? (
+        <ul className="flex flex-col gap-2">
+          {plans.map((plan) => {
+            const style = STATUS_STYLE[plan.status];
+            const Icon = style.icon;
+            return (
+              <li
+                key={plan.id}
+                className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-2.5"
+              >
+                <button
+                  type="button"
+                  onClick={() => cycleStatus(plan)}
+                  title="Click to change status"
                   className={cn(
-                    "flex min-h-[3.25rem] cursor-pointer select-none items-center gap-3 rounded-xl px-3.5 py-2.5",
-                    "border transition-colors duration-150",
-                    task.isComplete
-                      ? "border-emerald-500/30 bg-emerald-500/5"
-                      : "border-border bg-surface hover:border-border-strong",
+                    "inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                    style.className,
                   )}
                 >
-                  <input
-                    type="checkbox"
-                    checked={task.isComplete}
-                    onChange={() => onToggle(task)}
-                    className="peer sr-only"
-                  />
-
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "grid size-5 shrink-0 place-items-center rounded border-2 transition-colors",
-                      "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring",
-                      task.isComplete
-                        ? "border-emerald-500 bg-emerald-500 text-white"
-                        : "border-border-strong bg-surface-raised",
-                    )}
-                  >
-                    {task.isComplete ? (
-                      <Check className="size-3.5" />
-                    ) : null}
-                  </span>
-
-                  <span
-                    className={cn(
-                      "flex-1 text-sm",
-                      task.isComplete
-                        ? "text-muted line-through"
-                        : "text-foreground",
-                    )}
-                  >
-                    {task.title}
-                  </span>
-
-                  {task.dueDate ? (
-                    <span className="shrink-0 text-xs text-muted">
-                      {formatDate(task.dueDate)}
-                    </span>
-                  ) : null}
-                </label>
+                  <Icon className="size-3.5" />
+                  {ACTION_PLAN_STATUS_LABELS[plan.status]}
+                </button>
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 text-sm",
+                    plan.status === "DONE"
+                      ? "text-muted line-through"
+                      : "text-foreground",
+                  )}
+                >
+                  {plan.title}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => remove(plan)}
+                  aria-label={`Remove ${plan.title}`}
+                  className="shrink-0 rounded p-1 text-muted transition-colors hover:text-rose-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  <X className="size-3.5" />
+                </button>
               </li>
-            ))}
-          </ul>
-        </>
+            );
+          })}
+        </ul>
       ) : (
         <p className="text-sm text-muted">
-          No tasks yet. A goal is scored by the work inside it — add one and this
-          goal&apos;s score starts tracking your to-do list.
+          No action plans yet. Add the steps you&apos;ll take to hit this goal —
+          they&apos;re shown here, but the score comes from the measure above.
         </p>
       )}
 
@@ -147,8 +152,8 @@ export function TaskList({
         <input type="hidden" name="goalId" value={goalId} />
         <Input
           name="title"
-          placeholder="Add a task…"
-          aria-label="New task"
+          placeholder="Add an action plan…"
+          aria-label="New action plan"
           required
         />
         <Button

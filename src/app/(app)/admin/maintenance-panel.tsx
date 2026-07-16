@@ -37,7 +37,7 @@ const JOBS: Job[] = [
     label: "Recalculate scores",
     title: "Recalculate scores",
     description:
-      "Re-derives every member, coach, group and organization score, freezes today's snapshot and captures every leaderboard.",
+      "Re-derives every member, coach, council and organization score, freezes today's snapshot and captures every leaderboard.",
     icon: RefreshCw,
   },
   {

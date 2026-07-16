@@ -214,7 +214,7 @@ export function UsersClient({
             <TR>
               <TH>Member</TH>
               <TH>Roles</TH>
-              <TH>Group</TH>
+              <TH>Council</TH>
               <TH>Joined</TH>
               <TH>Last active</TH>
               <TH>Status</TH>
@@ -381,13 +381,13 @@ export function UsersClient({
             <RoleCheckboxes selected={["MENTEE"]} />
 
             <FormField
-              label="Coaching group"
-              hint="Optional. Placing them in a group also grants the Mentee role."
+              label="Council"
+              hint="Optional. Placing them in a council also grants the Mentee role."
             >
               <Select
                 name="groupId"
                 options={groupOptions}
-                placeholder="No group"
+                placeholder="No council"
               />
             </FormField>
           </div>

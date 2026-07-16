@@ -6,9 +6,10 @@ import { requireUser } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { ROLE_LABELS } from "@/lib/domain";
 import { scoreTone } from "@/lib/utils";
-import { getMenteeProfile } from "@/server/mentees";
+import { getMenteeProfile, listCouncilsForMember } from "@/server/mentees";
 
 import { AccessNotice, guard } from "../_components/guard";
+import { CouncilPicker } from "./council-picker";
 import { PasswordForm, ProfileForm, type ProfileDefaults } from "./forms";
 
 export const metadata: Metadata = { title: "Profile" };
@@ -44,6 +45,8 @@ export default async function ProfilePage() {
   }
 
   const { user: profile, score, group, joinedAt } = loaded.data;
+
+  const councils = await listCouncilsForMember(user);
 
   const defaults: ProfileDefaults = {
     firstName: profile.firstName,
@@ -105,7 +108,7 @@ export default async function ProfilePage() {
 
               {group ? (
                 <div className="flex items-center gap-2">
-                  <dt className="sr-only">Group and coach</dt>
+                  <dt className="sr-only">Council and coach</dt>
                   <UsersRound
                     className="size-3.5 shrink-0"
                     aria-hidden="true"
@@ -136,13 +139,17 @@ export default async function ProfilePage() {
         </div>
       </Card>
 
+      <div className="mt-4">
+        <CouncilPicker councils={councils} />
+      </div>
+
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card className="p-5 sm:p-6">
           <h2 className="text-base font-semibold tracking-tight">
             Edit profile
           </h2>
           <p className="mb-5 mt-0.5 text-sm text-muted">
-            How you appear to your coach and your group.
+            How you appear to your coach and your council.
           </p>
 
           <ProfileForm defaults={defaults} />

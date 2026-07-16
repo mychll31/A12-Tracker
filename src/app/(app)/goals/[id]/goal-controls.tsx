@@ -8,8 +8,10 @@ import { FormField, Input, Textarea } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import {
+  GOAL_DIRECTIONS,
   GOAL_STATUSES,
   GOAL_STATUS_LABELS,
+  type GoalDirection,
   type GoalStatus,
 } from "@/lib/domain";
 
@@ -22,6 +24,11 @@ const STATUS_OPTIONS = GOAL_STATUSES.map((key) => ({
   label: GOAL_STATUS_LABELS[key],
 }));
 
+const DIRECTION_OPTIONS = GOAL_DIRECTIONS.map((key) => ({
+  value: key,
+  label: key === "LOSE" ? "Lose" : "Gain",
+}));
+
 export type GoalControlsGoal = {
   id: string;
   title: string;
@@ -30,6 +37,10 @@ export type GoalControlsGoal = {
   status: GoalStatus;
   /** `YYYY-MM-DD` — what `<input type="date">` reads and writes. */
   targetDate: string;
+  direction: GoalDirection;
+  targetValue: number;
+  currentValue: number;
+  unit: string;
 };
 
 /** Closes a modal the moment its action lands without an error. */
@@ -122,7 +133,7 @@ export function GoalControls({ goal }: { goal: GoalControlsGoal }) {
         open={editing}
         onClose={() => setEditing(false)}
         title="Edit goal"
-        description="Progress itself is derived from tasks — it cannot be typed in here."
+        description="Edit the goal, its measure and target date. The score is the current value against the target."
         size="lg"
       >
         <form action={editAction} className="flex flex-col gap-5">
@@ -144,6 +155,43 @@ export function GoalControls({ goal }: { goal: GoalControlsGoal }) {
               defaultValue={goal.description ?? ""}
             />
           </FormField>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <FormField label="Direction" required>
+              <Select
+                name="direction"
+                options={DIRECTION_OPTIONS}
+                defaultValue={goal.direction}
+              />
+            </FormField>
+            <FormField label="Unit" hint="e.g. Kg, M, books">
+              <Input
+                name="unit"
+                defaultValue={goal.unit}
+                maxLength={20}
+                placeholder="Kg"
+              />
+            </FormField>
+            <FormField label="Target value" required>
+              <Input
+                name="targetValue"
+                type="number"
+                min={0}
+                step="any"
+                defaultValue={goal.targetValue}
+                required
+              />
+            </FormField>
+            <FormField label="Current value">
+              <Input
+                name="currentValue"
+                type="number"
+                min={0}
+                step="any"
+                defaultValue={goal.currentValue}
+              />
+            </FormField>
+          </div>
 
           <div className="grid gap-5 sm:grid-cols-2">
             <FormField label="Status" required>

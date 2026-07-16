@@ -5,6 +5,8 @@ import { z } from "zod";
 
 import { hashPassword, requireUser, verifyPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { ForbiddenError } from "@/lib/rbac";
+import { changeOwnCouncil } from "@/server/admin";
 
 import type { ProfileState } from "../_lib/form-state";
 
@@ -124,4 +126,43 @@ export async function changePassword(
 
   revalidatePath("/profile");
   return { error: null, success: "Password changed." };
+}
+
+const councilSchema = z.object({
+  councilId: z.string().trim().min(1, "Choose a council."),
+});
+
+/**
+ * A member moving themselves between councils. Keyed to `requireUser().id`, so —
+ * like the rest of this file — the form carries no user id to forge; it only
+ * names the council to join.
+ */
+export async function changeCouncilAction(
+  _prev: ProfileState,
+  formData: FormData,
+): Promise<ProfileState> {
+  const user = await requireUser();
+
+  const parsed = councilSchema.safeParse({
+    councilId: formData.get("councilId") ?? "",
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message, success: null };
+  }
+
+  try {
+    const { name } = await changeOwnCouncil(user, parsed.data.councilId);
+    revalidatePath("/profile");
+    revalidatePath("/dashboard");
+    revalidatePath("/leaderboards");
+    return { error: null, success: `You're now in ${name}.` };
+  } catch (error) {
+    // The server layer saying "no" (an archived council, a bad id) is a message
+    // to show, not a crash.
+    if (error instanceof ForbiddenError) {
+      return { error: error.message, success: null };
+    }
+    throw error;
+  }
 }

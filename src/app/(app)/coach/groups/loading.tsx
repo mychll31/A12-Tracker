@@ -5,7 +5,7 @@ export default function GroupsLoading() {
     <div
       role="status"
       aria-busy="true"
-      aria-label="Loading coaching groups"
+      aria-label="Loading councils"
       className="flex flex-col gap-8"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">

@@ -303,7 +303,7 @@ export async function reviewCheckInAction(
 // ---------------------------------------------------------------------------
 
 const createGroupSchema = z.object({
-  name: z.string().trim().min(1, "Name the group."),
+  name: z.string().trim().min(1, "Name the council."),
   description: z.string().trim().max(500).optional(),
 });
 

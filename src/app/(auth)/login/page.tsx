@@ -73,7 +73,7 @@ export default function LoginPage({
         </Link>
       </p>
 
-      <div className="mt-8 rounded-card border border-border bg-surface-sunken p-4">
+      {/* <div className="mt-8 rounded-card border border-border bg-surface-sunken p-4">
         <p className="text-xs font-medium">Demo accounts</p>
         <dl className="mt-2 space-y-1 text-xs text-muted">
           <div className="flex justify-between gap-4">
@@ -93,7 +93,7 @@ export default function LoginPage({
             <dd className="font-mono">Abundance123!</dd>
           </div>
         </dl>
-      </div>
+      </div> */}
     </div>
   );
 }

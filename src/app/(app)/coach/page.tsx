@@ -97,13 +97,13 @@ export default async function CoachDashboardPage() {
           deltaLabel="in the last 7 days"
         />
         <StatCard
-          label="Coaching groups"
+          label="Councils"
           value={totals.groups}
           icon={UsersRound}
           href="/coach/groups"
         />
         <StatCard
-          label="Average group score"
+          label="Average council score"
           value={formatScore(totals.avgGroupScore)}
           icon={Trophy}
           tone={scoreTone(totals.avgGroupScore)}
@@ -190,7 +190,7 @@ export default async function CoachDashboardPage() {
                         {mentee.firstName} {mentee.lastName}
                       </p>
                       <p className="truncate text-xs text-muted">
-                        {mentee.groupName ?? "No group"} · {riskReason(mentee)}
+                        {mentee.groupName ?? "No council"} · {riskReason(mentee)}
                       </p>
                     </div>
                     <span
@@ -214,7 +214,7 @@ export default async function CoachDashboardPage() {
           <CardHeader>
             <CardTitle as="h2">Your mentees</CardTitle>
             <CardDescription>
-              Every mentee across the groups you lead, strongest first.
+              Every mentee across the councils you lead, strongest first.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -271,7 +271,7 @@ export default async function CoachDashboardPage() {
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted">
-                  Groups led
+                  Councils led
                 </p>
                 <p className="mt-1 text-lg font-semibold tabular-nums">
                   {totals.groups}
@@ -285,17 +285,17 @@ export default async function CoachDashboardPage() {
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-3 [&>*]:min-w-0">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle as="h2">Coaching groups</CardTitle>
+            <CardTitle as="h2">Councils</CardTitle>
             <CardDescription>
-              The groups you lead, by average score.
+              The councils you lead, by average score.
             </CardDescription>
           </CardHeader>
           <CardContent>
             {data.groups.length === 0 ? (
               <EmptyState
                 icon={UsersRound}
-                title="You lead no groups yet"
-                description="Create a group and start placing mentees into it."
+                title="You lead no councils yet"
+                description="Create a council and start placing mentees into it."
                 className="border-0 bg-transparent py-8"
               />
             ) : (

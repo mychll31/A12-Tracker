@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { hashPassword, type SessionUser } from "@/lib/auth";
 import { ForbiddenError, coachMenteeIds } from "@/lib/rbac";
 import { NOTIFICATION_TYPES, asRoleKey, type RoleKey } from "@/lib/domain";
+import { logActivity } from "@/server/activity";
 
 /**
  * Administration.
@@ -367,6 +368,43 @@ export async function removeMenteeFromGroup(
     where: { menteeId, groupId, isActive: true },
     data: { isActive: false, leftAt: new Date() },
   });
+}
+
+/**
+ * Self-service placement: a member moves *themselves* into a council. Unlike a
+ * coach placement there is no ownership check — the guards are only that the
+ * council is real, active and in the actor's own organization. The move reuses
+ * the same one-council transaction (so any current membership is closed), and
+ * the join is logged so the receiving coach sees it in their activity feed.
+ */
+export async function changeOwnCouncil(
+  actor: SessionUser,
+  groupId: string,
+): Promise<{ name: string }> {
+  const group = await db.coachGroup.findFirst({
+    where: { id: groupId, isActive: true, organizationId: actor.organizationId },
+    select: { id: true, name: true },
+  });
+  if (!group) throw new ForbiddenError("That council is not available.");
+
+  // Already there: nothing to move, and no spurious "joined" entry.
+  const current = await db.groupMembership.findFirst({
+    where: { menteeId: actor.id, isActive: true },
+    select: { groupId: true },
+  });
+  if (current?.groupId === groupId) return { name: group.name };
+
+  await db.$transaction((tx) => placeInGroup(tx, actor.id, groupId));
+
+  await logActivity({
+    userId: actor.id,
+    actorId: actor.id,
+    type: "MEMBER_JOINED",
+    summary: `${actor.firstName} ${actor.lastName} joined ${group.name}.`,
+    metadata: { groupId },
+  });
+
+  return { name: group.name };
 }
 
 // ---------------------------------------------------------------------------

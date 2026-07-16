@@ -8,10 +8,15 @@ import {
   assertCanViewUser,
 } from "@/lib/rbac";
 import {
+  ACTION_PLAN_STATUSES,
   GOAL_CATEGORY_KEYS,
+  GOAL_DIRECTIONS,
+  PLAN_STATUS_WEIGHT,
   asGoalCategoryKey,
   asGoalStatus,
+  type ActionPlanStatus,
   type GoalCategoryKey,
+  type GoalDirection,
   type GoalStatus,
 } from "@/lib/domain";
 import { scoreCategories, scoreGoal, weightGoalScore } from "@/lib/scoring";
@@ -21,9 +26,10 @@ import { logActivity } from "@/server/activity";
 /**
  * Goals — the three-category engine at the centre of Abundance Hub.
  *
- * Progress is derived, never trusted: once a goal has tasks, the only way
- * to move its bar is to tick one. Every movement appends a GoalUpdate row, so
- * the trend chart reads a ledger rather than a guess.
+ * A goal's SCORE is its numeric measure: how far `currentValue` has come toward
+ * `targetValue` (a GAIN or a LOSE). Its action plans carry a status each; their
+ * completion is shown alongside the goal but never folded into the score. Every
+ * measure movement appends a GoalUpdate row, so the trend chart reads a ledger.
  */
 
 // ---------------------------------------------------------------------------
@@ -36,12 +42,11 @@ export type GoalCategoryRef = {
   accent: string;
 };
 
-export type GoalTaskItem = {
+export type ActionPlanItem = {
   id: string;
   title: string;
-  isComplete: boolean;
+  status: ActionPlanStatus;
   dueDate: Date | null;
-  completedAt: Date | null;
   sortOrder: number;
 };
 
@@ -90,12 +95,20 @@ export type GoalSummary = {
   targetDate: Date;
   completedAt: Date | null;
   category: GoalCategoryRef;
+  /** The measurable target that drives the score. */
+  direction: GoalDirection;
+  targetValue: number;
+  currentValue: number;
+  unit: string;
+  /** Action plans: how many there are, and how many are DONE. */
   taskCount: number;
   completedTasks: number;
+  /** Informational action-plan completion (done 100 / in-progress 50 / not-started 0). Never scored. */
+  planCompletion: number;
   /**
-   * The goal's own score, 0-100 — the weighted share of its to-do list that is
-   * done. `null` only for an abandoned goal, which is withdrawn from every
-   * average rather than dragging one down.
+   * The goal's own score, 0-100 — its numeric measure (current ÷ target). `null`
+   * only for an abandoned goal, which is withdrawn from every average rather than
+   * dragging one down.
    */
   score: number | null;
   daysUntilDue: number;
@@ -104,7 +117,7 @@ export type GoalSummary = {
 
 export type GoalDetail = GoalSummary & {
   notes: string | null;
-  tasks: GoalTaskItem[];
+  tasks: ActionPlanItem[];
   comments: GoalCommentItem[];
   updates: GoalUpdateItem[];
   attachments: GoalAttachmentItem[];
@@ -144,6 +157,20 @@ export type GoalSummaryStats = {
 
 const CLOSED_STATUSES: GoalStatus[] = ["COMPLETED", "ABANDONED"];
 
+const clampPct = (n: number) => Math.min(100, Math.max(0, n));
+
+function asPlanStatus(value: string): ActionPlanStatus {
+  return (ACTION_PLAN_STATUSES as readonly string[]).includes(value)
+    ? (value as ActionPlanStatus)
+    : "NOT_STARTED";
+}
+
+function asDirection(value: string): GoalDirection {
+  return (GOAL_DIRECTIONS as readonly string[]).includes(value)
+    ? (value as GoalDirection)
+    : "GAIN";
+}
+
 /**
  * AT_RISK is a judgement a coach or mentee makes. Overdue is arithmetic: a goal
  * past its target date that nobody has closed out is late whatever its status says.
@@ -153,20 +180,30 @@ function isOverdueGoal(targetDate: Date, status: GoalStatus): boolean {
 }
 
 /**
- * The stored `progress` column mirrors the goal's score so lists and charts can
- * read one column instead of joining the task list. It must therefore use the
- * same weighting scoreGoal() does, or the bar and the score would disagree.
+ * The stored `progress` column mirrors the goal's score — its numeric measure —
+ * so lists and charts read one column. It must use the same rule scoreGoal()
+ * does (current ÷ target), or the bar and the score would disagree. Falls back
+ * to the passed value when no target is set.
  */
-function deriveProgress(
-  tasks: { isComplete: boolean; weight: number }[],
+function measurePct(
+  targetValue: number,
+  currentValue: number,
   fallback: number,
 ): number {
-  if (tasks.length === 0) return Math.min(100, Math.max(0, fallback));
-  const total = tasks.reduce((sum, t) => sum + Math.max(1, t.weight), 0);
-  const done = tasks
-    .filter((t) => t.isComplete)
-    .reduce((sum, t) => sum + Math.max(1, t.weight), 0);
-  return total ? Math.round((done / total) * 100) : 0;
+  if (targetValue > 0) {
+    return clampPct(Math.round((currentValue / targetValue) * 100));
+  }
+  return clampPct(fallback);
+}
+
+/** Informational only: the mean status weight across a goal's action plans. */
+function planCompletionOf(tasks: { status: string }[]): number {
+  if (tasks.length === 0) return 0;
+  const sum = tasks.reduce(
+    (acc, t) => acc + PLAN_STATUS_WEIGHT[asPlanStatus(t.status)],
+    0,
+  );
+  return Math.round(sum / tasks.length);
 }
 
 const categorySelect = {
@@ -192,11 +229,15 @@ type GoalRowForSummary = {
   description: string | null;
   status: string;
   progress: number;
+  direction: string;
+  targetValue: number;
+  currentValue: number;
+  unit: string;
   startDate: Date;
   targetDate: Date;
   completedAt: Date | null;
   category: { key: string; name: string; accent: string };
-  tasks: { isComplete: boolean; weight: number }[];
+  tasks: { status: string }[];
 };
 
 function toSummary(goal: GoalRowForSummary): GoalSummary {
@@ -212,15 +253,22 @@ function toSummary(goal: GoalRowForSummary): GoalSummary {
     targetDate: goal.targetDate,
     completedAt: goal.completedAt,
     category: toCategoryRef(goal.category),
+    direction: asDirection(goal.direction),
+    targetValue: goal.targetValue,
+    currentValue: goal.currentValue,
+    unit: goal.unit,
     taskCount: goal.tasks.length,
-    completedTasks: goal.tasks.filter((t) => t.isComplete).length,
+    completedTasks: goal.tasks.filter((t) => asPlanStatus(t.status) === "DONE")
+      .length,
+    planCompletion: planCompletionOf(goal.tasks),
     // Scored by the same engine that ranks the leaderboards, so the number on a
     // goal card and the number a mentee is ranked by can never diverge.
     score: scoreGoal({
       status: goal.status,
       progress: goal.progress,
       categoryKey: goal.category.key,
-      tasks: goal.tasks,
+      targetValue: goal.targetValue,
+      currentValue: goal.currentValue,
     }),
     daysUntilDue: daysUntil(goal.targetDate),
     isOverdue: isOverdueGoal(goal.targetDate, status),
@@ -229,10 +277,7 @@ function toSummary(goal: GoalRowForSummary): GoalSummary {
 
 /** Owner and current state — the lookup every write path starts from. */
 async function loadGoalOrThrow(goalId: string) {
-  const goal = await db.goal.findUnique({
-    where: { id: goalId },
-    include: { tasks: { select: { isComplete: true, weight: true } } },
-  });
+  const goal = await db.goal.findUnique({ where: { id: goalId } });
   if (!goal) throw new ForbiddenError("That goal no longer exists.");
   return goal;
 }
@@ -257,7 +302,7 @@ export async function listGoals(
     orderBy: [{ targetDate: "asc" }, { createdAt: "desc" }],
     include: {
       category: categorySelect,
-      tasks: { select: { isComplete: true, weight: true } },
+      tasks: { select: { status: true } },
     },
   });
 
@@ -307,13 +352,12 @@ export async function getGoal(
   return {
     ...toSummary(goal),
     notes: goal.notes,
-    tasks: goal.tasks.map((m) => ({
-      id: m.id,
-      title: m.title,
-      isComplete: m.isComplete,
-      dueDate: m.dueDate,
-      completedAt: m.completedAt,
-      sortOrder: m.sortOrder,
+    tasks: goal.tasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      status: asPlanStatus(t.status),
+      dueDate: t.dueDate,
+      sortOrder: t.sortOrder,
     })),
     comments: comments.map((c) => ({
       id: c.id,
@@ -353,8 +397,9 @@ export async function goalSummaryFor(
       status: true,
       progress: true,
       targetDate: true,
+      targetValue: true,
+      currentValue: true,
       category: { select: { key: true } },
-      tasks: { select: { isComplete: true, weight: true } },
     },
   });
 
@@ -365,7 +410,8 @@ export async function goalSummaryFor(
     status: g.status,
     progress: g.progress,
     categoryKey: g.category.key,
-    tasks: g.tasks,
+    targetValue: g.targetValue,
+    currentValue: g.currentValue,
   }));
   const categoryScores = scoreCategories(scorable);
   const goalTotalScore = weightGoalScore(categoryScores);
@@ -435,24 +481,14 @@ export async function createGoal(
     description?: string;
     targetDate: Date;
     notes?: string;
+    direction?: GoalDirection;
+    targetValue?: number;
+    currentValue?: number;
+    unit?: string;
     tasks?: string[];
   },
 ): Promise<string> {
   await assertCanEditMentee(actor, input.userId);
-
-  // A goal's score is the weighted share of its to-do list that is done, so a
-  // goal with no tasks has nothing to be scored from and would sit at zero
-  // forever. Enforced here rather than in the form, so the API and any future
-  // caller obey the same rule.
-  const taskTitles = (input.tasks ?? [])
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0);
-
-  if (taskTitles.length === 0) {
-    throw new ForbiddenError(
-      "Add at least one task to this goal — a goal is scored by the work inside it.",
-    );
-  }
 
   const category = await db.goalCategory.findUnique({
     where: { key: input.categoryKey },
@@ -461,6 +497,13 @@ export async function createGoal(
   if (!category) {
     throw new Error(`Unknown goal category: ${input.categoryKey}`);
   }
+
+  const targetValue = Math.max(0, input.targetValue ?? 0);
+  const currentValue = Math.max(0, input.currentValue ?? 0);
+
+  const planTitles = (input.tasks ?? [])
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
 
   const goal = await db.goal.create({
     data: {
@@ -471,9 +514,14 @@ export async function createGoal(
       targetDate: input.targetDate,
       notes: input.notes ?? null,
       status: "NOT_STARTED",
-      progress: 0,
+      direction: input.direction ?? "GAIN",
+      targetValue,
+      currentValue,
+      unit: input.unit?.trim() ?? "",
+      // The stored bar mirrors the measure.
+      progress: measurePct(targetValue, currentValue, 0),
       tasks: {
-        create: taskTitles.map((title, index) => ({
+        create: planTitles.map((title, index) => ({
           title,
           sortOrder: index,
         })),
@@ -505,9 +553,12 @@ export async function updateGoal(
     title?: string;
     description?: string;
     status?: GoalStatus;
-    progress?: number;
     targetDate?: Date;
     notes?: string;
+    direction?: GoalDirection;
+    targetValue?: number;
+    currentValue?: number;
+    unit?: string;
   },
 ): Promise<void> {
   const goal = await loadGoalOrThrow(goalId);
@@ -517,17 +568,19 @@ export async function updateGoal(
   const statusTo = input.status ?? statusFrom;
   const progressFrom = goal.progress;
 
-  // Tasks own the progress bar. Once any exist a caller-supplied progress
-  // is ignored outright rather than fought with.
-  let progressTo = deriveProgress(
-    goal.tasks,
-    input.progress ?? progressFrom,
-  );
+  const targetValue =
+    input.targetValue !== undefined
+      ? Math.max(0, input.targetValue)
+      : goal.targetValue;
+  const currentValue =
+    input.currentValue !== undefined
+      ? Math.max(0, input.currentValue)
+      : goal.currentValue;
 
+  // The bar mirrors the measure; marking the goal done pins it to 100.
+  let progressTo = measurePct(targetValue, currentValue, progressFrom);
   const completing = statusTo === "COMPLETED" && statusFrom !== "COMPLETED";
   const reopening = statusFrom === "COMPLETED" && statusTo !== "COMPLETED";
-
-  // Marking a goal done is the statement; a bar left at 90 is not.
   if (statusTo === "COMPLETED") progressTo = 100;
 
   await db.goal.update({
@@ -541,6 +594,10 @@ export async function updateGoal(
         ? { targetDate: input.targetDate }
         : {}),
       ...(input.notes !== undefined ? { notes: input.notes } : {}),
+      ...(input.direction !== undefined ? { direction: input.direction } : {}),
+      ...(input.unit !== undefined ? { unit: input.unit.trim() } : {}),
+      targetValue,
+      currentValue,
       status: statusTo,
       progress: progressTo,
       ...(completing ? { completedAt: new Date() } : {}),
@@ -569,6 +626,50 @@ export async function updateGoal(
       ? `Completed the goal "${goal.title}"`
       : `Updated the goal "${goal.title}" — ${progressFrom}% to ${progressTo}%`,
     metadata: { progressFrom, progressTo, statusFrom, statusTo },
+  });
+}
+
+/** Updates just the "current" measure value and re-mirrors the bar. */
+export async function setGoalMeasure(
+  actor: SessionUser,
+  goalId: string,
+  currentValue: number,
+): Promise<void> {
+  const goal = await loadGoalOrThrow(goalId);
+  await assertCanEditMentee(actor, goal.userId);
+
+  const statusFrom = asGoalStatus(goal.status);
+  const progressFrom = goal.progress;
+  const current = Math.max(0, currentValue);
+  const progressTo =
+    statusFrom === "COMPLETED"
+      ? 100
+      : measurePct(goal.targetValue, current, progressFrom);
+
+  await db.goal.update({
+    where: { id: goalId },
+    data: { currentValue: current, progress: progressTo },
+  });
+
+  await db.goalUpdate.create({
+    data: {
+      goalId,
+      authorId: actor.id,
+      progressFrom,
+      progressTo,
+      statusFrom,
+      statusTo: statusFrom,
+    },
+  });
+
+  await logActivity({
+    userId: goal.userId,
+    actorId: actor.id,
+    type: "GOAL_UPDATED",
+    entityType: "goal",
+    entityId: goalId,
+    summary: `Measure on "${goal.title}" — ${progressFrom}% to ${progressTo}%`,
+    metadata: { progressFrom, progressTo, source: "measure" },
   });
 }
 
@@ -632,7 +733,20 @@ export async function addGoalComment(
   }
 }
 
-export async function addGoalTask(
+// ---------------------------------------------------------------------------
+// Action plans — a status each; never folded into the goal score.
+// ---------------------------------------------------------------------------
+
+async function loadPlanOrThrow(goalTaskId: string) {
+  const task = await db.goalTask.findUnique({
+    where: { id: goalTaskId },
+    include: { goal: { select: { id: true, userId: true } } },
+  });
+  if (!task) throw new ForbiddenError("That action plan no longer exists.");
+  return task;
+}
+
+export async function addActionPlan(
   actor: SessionUser,
   goalId: string,
   title: string,
@@ -641,81 +755,39 @@ export async function addGoalTask(
   await assertCanEditMentee(actor, goal.userId);
 
   const count = await db.goalTask.count({ where: { goalId } });
-  await db.goalTask.create({ data: { goalId, title, sortOrder: count } });
-
-  // The first task hands the progress bar over to the task list, so a
-  // goal sitting at a hand-typed 40% correctly falls back to 0-of-1 done.
-  await recomputeGoalProgress(actor, goalId);
+  await db.goalTask.create({
+    data: { goalId, title: title.trim(), sortOrder: count },
+  });
+  // No recompute: action-plan completion never feeds the goal score.
 }
 
-export async function toggleGoalTask(
+export async function setActionPlanStatus(
   actor: SessionUser,
   goalTaskId: string,
+  status: ActionPlanStatus,
 ): Promise<void> {
-  const task = await db.goalTask.findUnique({
-    where: { id: goalTaskId },
-    include: { goal: { select: { id: true, userId: true } } },
-  });
-  if (!task) throw new ForbiddenError("That task no longer exists.");
+  const task = await loadPlanOrThrow(goalTaskId);
   await assertCanEditMentee(actor, task.goal.userId);
 
-  const nowComplete = !task.isComplete;
+  const done = status === "DONE";
   await db.goalTask.update({
     where: { id: goalTaskId },
     data: {
-      isComplete: nowComplete,
-      completedAt: nowComplete ? new Date() : null,
+      status,
+      isComplete: done,
+      completedAt: done ? (task.completedAt ?? new Date()) : null,
     },
   });
-
-  await recomputeGoalProgress(actor, task.goal.id);
+  // No recompute: the goal score is the numeric measure, not the plans.
 }
 
-/**
- * Re-derives a goal's progress from its tasks and records the movement.
- * Shared by `addGoalTask` and `toggleGoalTask` so both agree on the number.
- */
-async function recomputeGoalProgress(
+export async function deleteActionPlan(
   actor: SessionUser,
-  goalId: string,
+  goalTaskId: string,
 ): Promise<void> {
-  const goal = await loadGoalOrThrow(goalId);
-
-  const statusFrom = asGoalStatus(goal.status);
-  const progressFrom = goal.progress;
-
-  // Ticking the last task does not silently close a goal — completion stays
-  // a deliberate act — but a goal already completed remains pinned at 100.
-  const progressTo =
-    statusFrom === "COMPLETED"
-      ? 100
-      : deriveProgress(goal.tasks, progressFrom);
-
-  await db.goal.update({
-    where: { id: goalId },
-    data: { progress: progressTo },
-  });
-
-  await db.goalUpdate.create({
-    data: {
-      goalId,
-      authorId: actor.id,
-      progressFrom,
-      progressTo,
-      statusFrom,
-      statusTo: statusFrom,
-    },
-  });
-
-  await logActivity({
-    userId: goal.userId,
-    actorId: actor.id,
-    type: "GOAL_UPDATED",
-    entityType: "goal",
-    entityId: goalId,
-    summary: `Task progress on "${goal.title}" — ${progressFrom}% to ${progressTo}%`,
-    metadata: { progressFrom, progressTo, source: "task" },
-  });
+  const task = await loadPlanOrThrow(goalTaskId);
+  await assertCanEditMentee(actor, task.goal.userId);
+  await db.goalTask.delete({ where: { id: goalTaskId } });
 }
 
 /**

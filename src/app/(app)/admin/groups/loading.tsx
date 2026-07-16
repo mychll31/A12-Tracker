@@ -5,7 +5,7 @@ export default function AdminGroupsLoading() {
     <div
       role="status"
       aria-busy="true"
-      aria-label="Loading coach groups"
+      aria-label="Loading councils"
       className="flex flex-col gap-6"
     >
       <div>

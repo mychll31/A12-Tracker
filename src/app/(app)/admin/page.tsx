@@ -38,9 +38,9 @@ const SECTIONS = [
   {
     href: "/admin/groups",
     icon: Network,
-    title: "Coach groups",
+    title: "Councils",
     description:
-      "Open groups, move mentees between them, and delegate edit access between coaches.",
+      "Open councils, move mentees between them, and delegate edit access between coaches.",
   },
   {
     href: "/admin/core-tasks",

@@ -261,9 +261,9 @@ export async function resetPasswordAction(
 // ---------------------------------------------------------------------------
 
 const createGroupSchema = z.object({
-  name: z.string().min(1, "Give the group a name."),
+  name: z.string().min(1, "Give the council a name."),
   description: z.string().optional(),
-  coachId: z.string().min(1, "Choose a coach to lead the group."),
+  coachId: z.string().min(1, "Choose a coach to lead the council."),
 });
 
 export async function createGroupAction(
@@ -285,8 +285,8 @@ export async function createGroupAction(
 }
 
 const updateGroupSchema = z.object({
-  groupId: z.string().min(1, "That group no longer exists."),
-  name: z.string().min(1, "Give the group a name.").optional(),
+  groupId: z.string().min(1, "That council no longer exists."),
+  name: z.string().min(1, "Give the council a name.").optional(),
   description: z.string().optional(),
   isActive: flag,
 });
@@ -306,13 +306,13 @@ export async function updateGroupAction(
     });
 
     await updateGroup(actor, groupId, input);
-    return "Group saved.";
+    return "Council saved.";
   }, GROUP_PATHS);
 }
 
 const assignMenteeSchema = z.object({
   menteeId: z.string().min(1, "Choose a mentee."),
-  groupId: z.string().min(1, "Choose a group."),
+  groupId: z.string().min(1, "Choose a council."),
 });
 
 export async function assignMenteeAction(
@@ -329,7 +329,7 @@ export async function assignMenteeAction(
 
     await assignMenteeToGroup(actor, input.menteeId, input.groupId);
     // The server closes any prior membership, so this is a move, not a copy.
-    return "Mentee moved into the group. Any previous membership was closed.";
+    return "Mentee moved into the council. Any previous membership was closed.";
   }, GROUP_PATHS);
 }
 
@@ -346,7 +346,7 @@ export async function removeMenteeAction(
     });
 
     await removeMenteeFromGroup(actor, input.menteeId, input.groupId);
-    return "Member removed from the group.";
+    return "Member removed from the council.";
   }, GROUP_PATHS);
 }
 
@@ -359,7 +359,7 @@ const grantDelegationSchema = z.object({
   // One control, two kinds of target — a delegation is never both at once.
   target: z
     .string()
-    .regex(/^(mentee|group):.+$/, "Choose a mentee or a group."),
+    .regex(/^(mentee|group):.+$/, "Choose a mentee or a council."),
   expiresAt: isoDate.optional(),
 });
 
@@ -473,7 +473,7 @@ export async function recalculateAction(
     const snapshots = await persistSnapshots(actor.organizationId);
     const rows = await captureLeaderboards(actor.organizationId);
 
-    return `Snapshotted ${snapshots.users} members, ${snapshots.coaches} coaches and ${snapshots.groups} groups, and captured ${rows} leaderboard rows.`;
+    return `Snapshotted ${snapshots.users} members, ${snapshots.coaches} coaches and ${snapshots.groups} councils, and captured ${rows} leaderboard rows.`;
   }, MAINTENANCE_PATHS);
 }
 

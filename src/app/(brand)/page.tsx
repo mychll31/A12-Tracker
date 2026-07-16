@@ -95,6 +95,8 @@ export default async function LandingPage() {
   const signedIn = user !== null;
 
   const arenaHref = signedIn ? "/dashboard" : "/register";
+  // "Enter the arena" sends a signed-out visitor to sign in (not sign up).
+  const enterHref = signedIn ? "/dashboard" : "/login";
   const finalCtaHref = signedIn ? "/dashboard" : "/register";
   const finalCtaLabel = signedIn
     ? "Back to your dashboard"
@@ -177,17 +179,9 @@ export default async function LandingPage() {
             </a>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {!signedIn && (
-              <a
-                href="/login"
-                style={{ fontSize: 14, color: "var(--a12-text)" }}
-              >
-                Sign in
-              </a>
-            )}
             <a
               className="a12-cta"
-              href={arenaHref}
+              href={enterHref}
               style={{
                 fontWeight: 700,
                 fontSize: 14,
@@ -506,7 +500,7 @@ export default async function LandingPage() {
               }}
             >
               See where you stand — and who you are climbing toward. Ranked by
-              score, tasks, consistency and circle.
+              score, tasks, consistency and council.
             </p>
           </div>
 

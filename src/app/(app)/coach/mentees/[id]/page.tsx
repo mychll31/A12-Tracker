@@ -13,7 +13,7 @@ import {
 
 import { requireCoach } from "@/lib/auth";
 import { ForbiddenError } from "@/lib/rbac";
-import { getMenteeProfile } from "@/server/mentees";
+import { getMenteeProfile, listGroups } from "@/server/mentees";
 import {
   categoryBreakdown,
   moodTrend,
@@ -54,7 +54,11 @@ import {
 
 import { GOAL_CATEGORY_LABELS } from "../../../goals/categories";
 import { GoalScoreBadge } from "../../../goals/goal-score-badge";
-import { NewNoteButton, ReviewBox } from "./mentee-actions";
+import {
+  ChangeCouncilButton,
+  NewNoteButton,
+  ReviewBox,
+} from "./mentee-actions";
 
 export const metadata: Metadata = { title: "Mentee" };
 
@@ -97,6 +101,14 @@ export default async function MenteeDrilldownPage({
 
   const { score, group, canEdit } = profile;
   const mentee = profile.user;
+
+  // The councils this coach leads — the only ones they may place a mentee into.
+  // assignMenteeToGroup re-checks ownership, so this list only decides the menu.
+  const myCouncils = user.coachGroupIds.length
+    ? (await listGroups(user))
+        .filter((g) => g.isActive && user.coachGroupIds.includes(g.id))
+        .map((g) => ({ id: g.id, name: g.name }))
+    : [];
 
   const [
     trend,
@@ -159,7 +171,7 @@ export default async function MenteeDrilldownPage({
                   <Badge variant="neutral">{group.name}</Badge>
                 </Link>
               ) : (
-                <Badge variant="neutral">No group</Badge>
+                <Badge variant="neutral">No council</Badge>
               )}
               {coachName ? <span>Coached by {coachName}</span> : null}
               <span className="inline-flex items-center gap-1">
@@ -191,6 +203,17 @@ export default async function MenteeDrilldownPage({
             className="shrink-0"
           />
         </div>
+
+        {myCouncils.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            <ChangeCouncilButton
+              menteeId={mentee.id}
+              firstName={mentee.firstName}
+              councils={myCouncils}
+              currentCouncilId={group?.id ?? null}
+            />
+          </div>
+        ) : null}
 
         {!canEdit ? (
           <p className="flex items-start gap-2 rounded-card border border-border bg-surface-sunken px-4 py-3 text-sm text-muted">

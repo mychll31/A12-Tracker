@@ -564,36 +564,63 @@ const TOMORROW = [
 
 const GOAL_TEMPLATES: Record<
   GoalCategoryKey,
-  { title: string; description: string }[]
+  {
+    title: string;
+    description: string;
+    // The numeric measure that scores the goal. For LOSE goals the target is
+    // the amount to shed and `current` is how much has been shed so far, so the
+    // score still reads current ÷ target.
+    direction: "GAIN" | "LOSE";
+    unit: string;
+    targetValue: number;
+  }[]
 > = {
   PERSONAL: [
     {
       title: "Lose 15 pounds",
       description:
         "Down to 175 by year end without crash dieting. Strength and sleep first.",
+      direction: "LOSE",
+      unit: "lbs",
+      targetValue: 15,
     },
     {
       title: "Read 24 books this year",
       description:
         "Two a month, alternating non-fiction and fiction. Thirty pages before bed.",
+      direction: "GAIN",
+      unit: "books",
+      targetValue: 24,
     },
     {
       title: "Repair relationship with my brother",
       description:
         "Monthly calls, one visit before winter, and no keeping score.",
+      direction: "GAIN",
+      unit: "calls",
+      targetValue: 12,
     },
     {
       title: "Run a half marathon",
       description: "Sub two hours, injury-free, off a sixteen-week base plan.",
+      direction: "GAIN",
+      unit: "km",
+      targetValue: 21,
     },
     {
       title: "Sleep seven hours every night",
       description: "Lights out by 10:30. The phone charges outside the bedroom.",
+      direction: "GAIN",
+      unit: "hrs",
+      targetValue: 7,
     },
     {
       title: "Cut screen time to two hours a day",
       description:
         "Reclaim the evenings from the algorithm and give them back to my family.",
+      direction: "LOSE",
+      unit: "hrs",
+      targetValue: 3,
     },
   ],
   PROFESSIONAL: [
@@ -601,29 +628,47 @@ const GOAL_TEMPLATES: Record<
       title: "Increase sales by 30%",
       description:
         "From $1.8M to $2.35M this year. Pipeline discipline over hero deals.",
+      direction: "GAIN",
+      unit: "%",
+      targetValue: 30,
     },
     {
       title: "Launch consulting business",
       description:
         "Registered, three paying clients, and one repeatable offer I can sell twice.",
+      direction: "GAIN",
+      unit: "clients",
+      targetValue: 3,
     },
     {
       title: "Get promoted to senior",
       description: "Own a workstream end to end, and be visible while doing it.",
+      direction: "GAIN",
+      unit: "milestones",
+      targetValue: 4,
     },
     {
       title: "Earn the PMP certification",
       description:
         "Thirty-five contact hours, then sit the exam before the end of Q4.",
+      direction: "GAIN",
+      unit: "hrs",
+      targetValue: 35,
     },
     {
       title: "Ship the platform rewrite",
       description: "Cut over with no downtime and retire the legacy stack for good.",
+      direction: "GAIN",
+      unit: "milestones",
+      targetValue: 5,
     },
     {
       title: "Speak at a national conference",
       description:
         "One accepted talk, on work I actually did, to people who can tell.",
+      direction: "GAIN",
+      unit: "milestones",
+      targetValue: 3,
     },
   ],
   CONTRIBUTION: [
@@ -631,28 +676,46 @@ const GOAL_TEMPLATES: Record<
       title: "Mentor 3 junior colleagues",
       description:
         "Weekly one-to-ones, honest feedback, and a stretch project each.",
+      direction: "GAIN",
+      unit: "mentees",
+      targetValue: 3,
     },
     {
       title: "Volunteer 100 hours",
       description:
         "Saturdays at the shelter kitchen. Show up when it is inconvenient.",
+      direction: "GAIN",
+      unit: "hrs",
+      targetValue: 100,
     },
     {
       title: "Serve on the community board",
       description:
         "Run for the seat, win it, and actually do the reading before meetings.",
+      direction: "GAIN",
+      unit: "milestones",
+      targetValue: 4,
     },
     {
       title: "Teach a free weekend workshop",
       description: "Four sessions, open to anyone, no gatekeeping and no upsell.",
+      direction: "GAIN",
+      unit: "sessions",
+      targetValue: 4,
     },
     {
       title: "Raise $10k for the youth shelter",
       description: "One campaign, one event, and a great deal of asking.",
+      direction: "GAIN",
+      unit: "USD",
+      targetValue: 10000,
     },
     {
       title: "Sponsor a scholarship student",
       description: "Fund one year, then stay in their corner for the other three.",
+      direction: "GAIN",
+      unit: "years",
+      targetValue: 4,
     },
   ],
 };
@@ -823,6 +886,9 @@ type PlannedGoal = {
   description: string;
   status: GoalStatus;
   progress: number;
+  direction: "GAIN" | "LOSE";
+  unit: string;
+  targetValue: number;
   startDate: Date;
   targetDate: Date;
   completedAt: Date | null;
@@ -900,6 +966,9 @@ function planGoals(person: SeedPerson): PlannedGoal[] {
       description: template.description,
       status,
       progress,
+      direction: template.direction,
+      unit: template.unit,
+      targetValue: template.targetValue,
       startDate,
       targetDate,
       completedAt:
@@ -1149,6 +1218,10 @@ async function main(): Promise<void> {
   });
 
   // --- Goals, tasks, updates, comments -------------------------------
+  // Every goal is scored by a numeric measure (current vs. target), not by its
+  // action plans. The measure — direction, unit and target — comes from each
+  // goal's own template, so it always fits the title (lose 15 lbs, read 24
+  // books, volunteer 100 hrs).
   const goalsByPerson = new Map<string, PlannedGoal[]>();
 
   for (const person of mentees) {
@@ -1158,6 +1231,25 @@ async function main(): Promise<void> {
     goalsByPerson.set(person.slug, planned);
 
     for (const goal of planned) {
+      // Place `current` so that current ÷ target matches the planned progress,
+      // then set the stored `progress` column to exactly what `scoreGoal` will
+      // compute from it — the column is a pure mirror of the measure. Whole-unit
+      // targets (books, clients) get a whole `current`; fractional ones (km, %)
+      // keep a decimal.
+      const targetValue = goal.targetValue;
+      const whole = Number.isInteger(targetValue) && targetValue <= 100;
+      const raw = (targetValue * goal.progress) / 100;
+      const currentValue =
+        goal.status === "COMPLETED"
+          ? targetValue
+          : whole
+            ? Math.round(raw)
+            : Math.round(raw * 10) / 10;
+      goal.progress =
+        targetValue > 0
+          ? clampInt(Math.round((currentValue / targetValue) * 100), 0, 100)
+          : goal.progress;
+
       await db.goal.upsert({
         where: { id: goal.id },
         create: {
@@ -1171,6 +1263,10 @@ async function main(): Promise<void> {
           description: goal.description,
           status: goal.status,
           progress: goal.progress,
+          direction: goal.direction,
+          targetValue,
+          currentValue,
+          unit: goal.unit,
           startDate: goal.startDate,
           targetDate: goal.targetDate,
           completedAt: goal.completedAt,
@@ -1178,15 +1274,20 @@ async function main(): Promise<void> {
         update: {
           status: goal.status,
           progress: goal.progress,
+          direction: goal.direction,
+          targetValue,
+          currentValue,
+          unit: goal.unit,
           targetDate: goal.targetDate,
           completedAt: goal.completedAt,
         },
       });
 
-      // --- tasks ---
-      // Every goal carries a to-do list. The goal's score is the weighted share
-      // of these that are done, so a goal without tasks would have nothing to be
-      // scored from.
+      // --- action plans ---
+      // Every goal carries a short action-plan list. These are informational
+      // only — the score comes from the measure above, never from the plans —
+      // so they never write back to the goal's progress. A demo mix of statuses
+      // makes the tracker show all three states out of the box.
       {
         const count = int(rng, 3, 5);
         const offset = int(rng, 0, GOAL_TASK_TITLES.length - 1);
@@ -1198,9 +1299,15 @@ async function main(): Promise<void> {
         );
 
         for (let i = 0; i < count; i += 1) {
-          // isComplete has to agree with the goal's progress bar, or the UI
-          // would contradict itself.
-          const isComplete = goal.progress >= ((i + 1) / count) * 100;
+          // Plans below the goal's progress read as done, the one straddling it
+          // as in-progress, and the rest as not started.
+          const status =
+            goal.progress >= ((i + 1) / count) * 100
+              ? "DONE"
+              : goal.progress >= (i / count) * 100
+                ? "IN_PROGRESS"
+                : "NOT_STARTED";
+          const isComplete = status === "DONE";
           const dueDate = dayKey(
             addDays(goal.startDate, Math.round(((i + 1) / count) * spanDays)),
           );
@@ -1212,36 +1319,18 @@ async function main(): Promise<void> {
               goalId: goal.id,
               title:
                 GOAL_TASK_TITLES[(offset + i) % GOAL_TASK_TITLES.length] ?? "",
+              status,
               isComplete,
               dueDate,
               completedAt: isComplete ? atHour(dueDate, 18) : null,
               sortOrder: i,
             },
             update: {
+              status,
               isComplete,
               completedAt: isComplete ? atHour(dueDate, 18) : null,
             },
           });
-        }
-
-        // The goal's score is the share of its tasks that are done, and the
-        // `progress` column is only a cached mirror of that. Writing back the
-        // exact derived value keeps the progress bar and the score from telling
-        // the user two different stories about the same goal.
-        const done = await db.goalTask.count({
-          where: { goalId: goal.id, isComplete: true },
-        });
-        const derived =
-          goal.status === "COMPLETED"
-            ? 100
-            : Math.round((done / count) * 100);
-
-        if (derived !== goal.progress) {
-          await db.goal.update({
-            where: { id: goal.id },
-            data: { progress: derived },
-          });
-          goal.progress = derived;
         }
       }
 

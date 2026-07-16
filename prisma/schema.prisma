@@ -213,7 +213,13 @@ model Goal {
   title       String
   description String?
   status      String    @default("NOT_STARTED") // NOT_STARTED | IN_PROGRESS | AT_RISK | COMPLETED | ABANDONED
-  progress    Int       @default(0) // 0-100; mirrors the goal task list — see scoreGoal() in src/lib/scoring.ts
+  progress    Int       @default(0) // 0-100; mirrors the measure — see scoreGoal() in src/lib/scoring.ts
+  /// The measurable target. `direction` is GAIN or LOSE; the goal score is
+  /// currentValue / targetValue, capped 0-100. `unit` is a display label ("Kg").
+  direction    String   @default("GAIN") // GAIN | LOSE
+  targetValue  Float    @default(0)
+  currentValue Float    @default(0)
+  unit         String   @default("")
   startDate   DateTime  @default(now())
   targetDate  DateTime
   completedAt DateTime?
@@ -233,19 +239,21 @@ model Goal {
   @@map("goals")
 }
 
-/// The goal's to-do list. A goal is only as done as its tasks, so these are what
-/// the goal's score is computed from — see scoreGoal() in src/lib/scoring.ts.
+/// A goal's action plans. Each has a `status` (NOT_STARTED | IN_PROGRESS | DONE).
+/// The goal's SCORE is the numeric measure on the goal (currentValue /
+/// targetValue), NOT these — but their completion is shown alongside as an
+/// informational figure (done 100, in-progress 50, not-started 0).
 model GoalTask {
-  id          String    @id @default(cuid())
+  id          String  @id @default(cuid())
   goalId      String
   title       String
-  isComplete  Boolean   @default(false)
+  status      String  @default("NOT_STARTED") // NOT_STARTED | IN_PROGRESS | DONE
+  /// Derived convenience flag, kept in step with status === "DONE".
+  isComplete  Boolean @default(false)
   dueDate     DateTime?
   completedAt DateTime?
-  sortOrder   Int       @default(0)
-  /// Lets a heavy task count for more than a trivial one. Defaults to 1, so a
-  /// goal whose tasks are all unweighted scores as a plain percentage complete.
-  weight      Int       @default(1)
+  sortOrder   Int     @default(0)
+  weight      Int     @default(1)
 
   goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
 

@@ -65,7 +65,7 @@ function MenteeGridCard({
           ) : null}
 
           <p className="mt-1 truncate text-xs text-muted">
-            {mentee.groupName ?? "No group"}
+            {mentee.groupName ?? "No council"}
             {mentee.coachName && !isMine ? (
               <> · Coached by {mentee.coachName}</>
             ) : null}
@@ -162,7 +162,7 @@ export default async function MenteesPage({
   const others = mentees.filter((m) => !isMine(m));
 
   const groupOptions = [
-    { value: "", label: "All groups" },
+    { value: "", label: "All councils" },
     ...groups.map((group) => ({
       value: group.id,
       label: `${group.name} — ${group.coach.firstName} ${group.coach.lastName}`,
@@ -210,7 +210,7 @@ export default async function MenteesPage({
             htmlFor="mentee-group"
             className="text-sm font-medium text-muted-strong"
           >
-            Group
+            Council
           </label>
           <Select
             id="mentee-group"
@@ -231,7 +231,7 @@ export default async function MenteesPage({
           title="No mentees match"
           description={
             filtered
-              ? "Try a different name, or widen the filter to all groups."
+              ? "Try a different name, or widen the filter to all councils."
               : "No mentee has been added to this organization yet."
           }
           action={
@@ -259,7 +259,7 @@ export default async function MenteesPage({
               <EmptyState
                 icon={Users}
                 title="None of these are yours"
-                description="The people below sit in other coaches' groups. You can read them, but not edit them."
+                description="The people below sit in other coaches' councils. You can read them, but not edit them."
               />
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
