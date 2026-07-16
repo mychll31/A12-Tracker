@@ -21,11 +21,12 @@ import {
   taskBreakdown,
   taskHistory,
 } from "@/server/core-tasks";
-import { listMeritTargets } from "@/server/goals";
+import { listMeritTargets, listMilestoneTargets } from "@/server/goals";
 
 import { TodayTasks } from "../dashboard/today-tasks";
 import { DateNav } from "./date-nav";
 import { MeritTargets } from "./merit-targets";
+import { MilestoneTargets } from "./milestone-targets";
 
 export const metadata: Metadata = { title: "Core Tasks" };
 
@@ -54,13 +55,15 @@ export default async function CoreTasksPage({
   const selectedDate = new Date(`${selectedIso}T00:00:00.000Z`);
   const isToday = selectedIso === todayIso;
 
-  const [board, history, breakdown, missed, meritTargets] = await Promise.all([
-    getTaskBoard(user, user.id, selectedDate),
-    taskHistory(user, user.id, HISTORY_DAYS),
-    taskBreakdown(user, user.id, CHART_DAYS),
-    missedDays(user, user.id, CHART_DAYS),
-    listMeritTargets(user, user.id),
-  ]);
+  const [board, history, breakdown, missed, meritTargets, milestoneTargets] =
+    await Promise.all([
+      getTaskBoard(user, user.id, selectedDate),
+      taskHistory(user, user.id, HISTORY_DAYS),
+      taskBreakdown(user, user.id, CHART_DAYS),
+      missedDays(user, user.id, CHART_DAYS),
+      listMeritTargets(user, user.id),
+      listMilestoneTargets(user, user.id),
+    ]);
 
   const recent = history.slice(-CHART_DAYS);
   const keptDays = recent.filter((day) => day.completed > 0).length;
@@ -176,6 +179,21 @@ export default async function CoreTasksPage({
           </CardHeader>
           <CardContent>
             <MeritTargets items={meritTargets} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {isToday && milestoneTargets.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle as="h2">Milestone goals</CardTitle>
+            <CardDescription>
+              Your milestone goals and their action plans. Move a plan forward —
+              its status is what moves the goal&apos;s score.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MilestoneTargets items={milestoneTargets} />
           </CardContent>
         </Card>
       ) : null}

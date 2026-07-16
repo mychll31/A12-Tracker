@@ -19,6 +19,7 @@ DELETE FROM "core_task_completions";
 DELETE FROM "goal_comments";
 DELETE FROM "goal_updates";
 DELETE FROM "goal_tasks";
+DELETE FROM "merit_logs";
 DELETE FROM "goals";
 DELETE FROM "leaderboard_entries";
 DELETE FROM "score_snapshots";

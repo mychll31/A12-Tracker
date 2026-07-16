@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, Menu, X } from "lucide-react";
 
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NavLinks } from "./sidebar";
 import { UserMenu, type UserMenuProps } from "./user-menu";
 import { Wordmark } from "./wordmark";
@@ -74,7 +73,6 @@ export function Topbar({
           ) : null}
         </Link>
 
-        <ThemeToggle />
         <UserMenu {...user} />
       </header>
 

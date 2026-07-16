@@ -26,18 +26,56 @@ async function addColumn(table, name, definition) {
   const existing = await columns(table);
   if (existing.has(name)) {
     console.log(`patch-turso-schema: ${table}.${name} exists.`);
-    return;
+    return false;
   }
 
   await client.execute(`ALTER TABLE "${table}" ADD COLUMN "${name}" ${definition}`);
   console.log(`patch-turso-schema: added ${table}.${name}.`);
+  return true;
 }
 
 await addColumn("goals", "direction", "TEXT NOT NULL DEFAULT 'GAIN'");
 await addColumn("goals", "targetValue", "REAL NOT NULL DEFAULT 0");
 await addColumn("goals", "currentValue", "REAL NOT NULL DEFAULT 0");
 await addColumn("goals", "unit", "TEXT NOT NULL DEFAULT ''");
+await addColumn("goals", "goalType", "TEXT NOT NULL DEFAULT 'MERIT'");
+const addedTargetPeriod = await addColumn(
+  "goals",
+  "targetPeriod",
+  "TEXT NOT NULL DEFAULT 'NONE'",
+);
 await addColumn("goal_tasks", "status", "TEXT NOT NULL DEFAULT 'NOT_STARTED'");
+
+await client.execute(`
+  CREATE TABLE IF NOT EXISTS "merit_logs" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "goalId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "date" DATETIME NOT NULL,
+    "amount" REAL NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "merit_logs_goalId_fkey" FOREIGN KEY ("goalId") REFERENCES "goals" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "merit_logs_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+  )
+`);
+
+await client.execute(`
+  CREATE INDEX IF NOT EXISTS "merit_logs_userId_date_idx"
+  ON "merit_logs"("userId", "date")
+`);
+
+await client.execute(`
+  CREATE UNIQUE INDEX IF NOT EXISTS "merit_logs_goalId_date_key"
+  ON "merit_logs"("goalId", "date")
+`);
+
+if (addedTargetPeriod) {
+  await client.execute(`
+    UPDATE "goals"
+    SET "targetPeriod" = 'DAILY'
+    WHERE "goalType" = 'MERIT'
+  `);
+}
 
 await client.execute(`
   UPDATE "goals"

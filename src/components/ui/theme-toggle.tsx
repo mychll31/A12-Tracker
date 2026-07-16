@@ -70,7 +70,11 @@ export interface ThemeToggleProps {
   className?: string;
 }
 
-export function ThemeToggle({ className }: ThemeToggleProps) {
+/**
+ * The theme, kept in step with localStorage and the `<html>` class. Shared by
+ * the topbar toggle and the profile-menu chooser so the two never drift apart.
+ */
+export function useTheme() {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   // Keep the <html> class in step with the stored preference. No setState here,
@@ -87,6 +91,13 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
     media.addEventListener("change", onChange);
     return () => media.removeEventListener("change", onChange);
   }, [theme]);
+
+  const setTheme = useCallback((next: Theme) => persistTheme(next), []);
+  return { theme, setTheme };
+}
+
+export function ThemeToggle({ className }: ThemeToggleProps) {
+  const { theme } = useTheme();
 
   const cycle = useCallback(() => {
     persistTheme(ORDER[(ORDER.indexOf(getSnapshot()) + 1) % ORDER.length]);
@@ -112,5 +123,45 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
     >
       <Icon className="size-4" />
     </button>
+  );
+}
+
+/**
+ * A three-way theme chooser (Light / Dark / System) for menus, where an
+ * icon-only cycle button would be too terse.
+ */
+export function ThemeChoices({ className }: { className?: string }) {
+  const { theme, setTheme } = useTheme();
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Theme"
+      className={cn("grid grid-cols-3 gap-1", className)}
+    >
+      {ORDER.map((option) => {
+        const { icon: Icon, label } = OPTIONS[option];
+        const active = theme === option;
+        return (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => setTheme(option)}
+            className={cn(
+              "flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-[0.6875rem] font-medium",
+              "transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+              active
+                ? "border-primary bg-primary-soft text-primary"
+                : "border-border text-muted hover:border-border-strong hover:text-foreground",
+            )}
+          >
+            <Icon className="size-4" />
+            {label}
+          </button>
+        );
+      })}
+    </div>
   );
 }

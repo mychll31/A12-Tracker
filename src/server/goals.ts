@@ -1086,6 +1086,55 @@ export async function listMeritTargets(
   return items;
 }
 
+export type MilestoneTargetItem = {
+  goalId: string;
+  title: string;
+  categoryKey: GoalCategoryKey;
+  /** The goal's current score, 0-100 (its plans' mean completion). */
+  score: number;
+  plans: ActionPlanItem[];
+};
+
+/**
+ * A user's open MILESTONE goals and their action plans — the goal-derived
+ * checklists that show up on the Core Tasks board. Moving a plan's status is
+ * what moves a milestone goal's score.
+ */
+export async function listMilestoneTargets(
+  actor: SessionUser,
+  userId: string,
+): Promise<MilestoneTargetItem[]> {
+  await assertCanViewUser(actor, userId);
+
+  const goals = await db.goal.findMany({
+    where: {
+      userId,
+      goalType: "MILESTONE",
+      status: { notIn: ["COMPLETED", "ABANDONED"] },
+      tasks: { some: {} },
+    },
+    include: {
+      category: { select: { key: true } },
+      tasks: { orderBy: { sortOrder: "asc" } },
+    },
+    orderBy: [{ targetDate: "asc" }],
+  });
+
+  return goals.map((g) => ({
+    goalId: g.id,
+    title: g.title,
+    categoryKey: asGoalCategoryKey(g.category.key),
+    score: g.progress,
+    plans: g.tasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      status: asPlanStatus(t.status),
+      dueDate: t.dueDate,
+      sortOrder: t.sortOrder,
+    })),
+  }));
+}
+
 /**
  * The required categories a user has no goal in.
  *

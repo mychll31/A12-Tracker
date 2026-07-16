@@ -6,6 +6,7 @@ import { ChevronDown, LogOut, User } from "lucide-react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { ThemeChoices } from "@/components/ui/theme-toggle";
 import { signOut } from "@/app/(auth)/actions";
 import { cn } from "@/lib/utils";
 import type { RoleKey } from "@/lib/domain";
@@ -91,6 +92,13 @@ export function UserMenu({
                 </Badge>
               ))}
             </div>
+          </div>
+
+          <div className="border-b border-border p-2">
+            <p className="px-1 pb-1.5 text-xs font-medium text-muted">
+              Appearance
+            </p>
+            <ThemeChoices />
           </div>
 
           <div className="p-1">

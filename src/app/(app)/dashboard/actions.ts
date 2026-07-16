@@ -4,9 +4,14 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireUser } from "@/lib/auth";
+import { ACTION_PLAN_STATUSES } from "@/lib/domain";
 import { ForbiddenError } from "@/lib/rbac";
 import { toggleCoreTask } from "@/server/core-tasks";
-import { goExtraMile, logMeritTarget } from "@/server/goals";
+import {
+  goExtraMile,
+  logMeritTarget,
+  setActionPlanStatus,
+} from "@/server/goals";
 
 export type ToggleTaskResult = { error: string | null };
 
@@ -112,6 +117,33 @@ export async function goExtraMileAction(
 
   try {
     await goExtraMile(actor, parsed.data.goalId, parsed.data.amount);
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { error: error.message };
+    throw error;
+  }
+
+  revalidateMerit();
+  return { error: null };
+}
+
+const planStatusSchema = z.object({
+  goalTaskId: z.string().min(1, "Missing plan."),
+  status: z.enum(ACTION_PLAN_STATUSES),
+});
+
+/** Cycles a milestone goal's action plan from the Core Tasks board. */
+export async function setMilestonePlanAction(
+  formData: FormData,
+): Promise<ToggleTaskResult> {
+  const actor = await requireUser();
+  const parsed = planStatusSchema.safeParse({
+    goalTaskId: formData.get("goalTaskId"),
+    status: formData.get("status"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  try {
+    await setActionPlanStatus(actor, parsed.data.goalTaskId, parsed.data.status);
   } catch (error) {
     if (error instanceof ForbiddenError) return { error: error.message };
     throw error;

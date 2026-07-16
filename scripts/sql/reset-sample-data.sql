@@ -34,6 +34,7 @@ DELETE FROM "core_task_completions";
 DELETE FROM "goal_comments";
 DELETE FROM "goal_updates";
 DELETE FROM "goal_tasks";
+DELETE FROM "merit_logs";
 DELETE FROM "goals";
 DELETE FROM "leaderboard_entries";
 DELETE FROM "score_snapshots";
@@ -473,6 +474,8 @@ INSERT INTO "goals" (
   "targetValue",
   "currentValue",
   "unit",
+  "goalType",
+  "targetPeriod",
   "startDate",
   "targetDate",
   "completedAt",
@@ -510,6 +513,14 @@ SELECT
     ELSE 20 + ((c + category_order) % 30)
   END,
   '%',
+  CASE
+    WHEN category_key = 'CONTRIBUTION' THEN 'MILESTONE'
+    ELSE 'MERIT'
+  END,
+  CASE
+    WHEN category_key = 'CONTRIBUTION' THEN 'NONE'
+    ELSE 'DAILY'
+  END,
   datetime('now', printf('-%d days', 14 + c + m + category_order)),
   CASE status_bucket
     WHEN 2 THEN datetime('now', printf('-%d days', 2 + m))

@@ -12,11 +12,10 @@ import { formatDate } from "@/lib/dates";
 import {
   GOAL_CATEGORY_KEYS,
   GOAL_STATUSES,
-  GOAL_STATUS_LABELS,
   type GoalCategoryKey,
   type GoalStatus,
 } from "@/lib/domain";
-import { cn, formatScore, scoreTone, TONE_TEXT } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { goalSummaryFor, listGoals } from "@/server/goals";
 
 import { GOAL_CATEGORY_LABELS } from "./categories";
@@ -172,66 +171,6 @@ export default async function GoalsPage({
         </div>
       </section>
 
-      <section className="flex flex-col gap-4">
-        <div className="flex items-baseline justify-between gap-4">
-          <h2 className="text-lg font-semibold tracking-tight">
-            The three categories
-          </h2>
-          <p className="text-xs text-muted">Each pulls equal weight.</p>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          {GOAL_CATEGORY_KEYS.map((key) => {
-            const row = stats.byCategory[key];
-            const empty = row.total === 0;
-
-            return (
-              <Card key={key} className="flex flex-col gap-4 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold">
-                      {GOAL_CATEGORY_LABELS[key]}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted">
-                      {row.total} {row.total === 1 ? "goal" : "goals"} ·{" "}
-                      {row.completed} completed
-                    </p>
-                  </div>
-                  <span
-                    className={cn(
-                      "text-2xl font-semibold tabular-nums leading-none",
-                      TONE_TEXT[scoreTone(row.score)],
-                    )}
-                  >
-                    {formatScore(row.score)}
-                  </span>
-                </div>
-
-                <ProgressBar
-                  value={row.score}
-                  label="Category score"
-                  showValue={false}
-                />
-
-                {empty ? (
-                  <div className="mt-auto flex flex-col gap-2">
-                    <p className="text-xs font-medium text-rose-500 dark:text-rose-400">
-                      No goal set — scoring 0
-                    </p>
-                    <NewGoalDialog
-                      defaultCategory={key}
-                      triggerLabel={`Set your ${GOAL_CATEGORY_LABELS[key]} goal`}
-                      triggerVariant="outline"
-                      triggerSize="sm"
-                    />
-                  </div>
-                ) : null}
-              </Card>
-            );
-          })}
-        </div>
-      </section>
-
       <section className="flex flex-col gap-3">
         <div
           className="scroll-thin flex items-center gap-2 overflow-x-auto pb-1"
@@ -250,24 +189,6 @@ export default async function GoalsPage({
               <span className="ml-1.5 text-muted">
                 {stats.byCategory[key].total}
               </span>
-            </Chip>
-          ))}
-        </div>
-
-        <div
-          className="scroll-thin flex items-center gap-2 overflow-x-auto pb-1"
-          aria-label="Filter by status"
-        >
-          <Chip href={chipHref({ category: params.category })} active={!status}>
-            Any status
-          </Chip>
-          {GOAL_STATUSES.map((key) => (
-            <Chip
-              key={key}
-              href={chipHref({ category: params.category, status: key })}
-              active={status === key}
-            >
-              {GOAL_STATUS_LABELS[key]}
             </Chip>
           ))}
         </div>
