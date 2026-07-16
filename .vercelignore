@@ -1,3 +1,22 @@
 # Manual database reset scripts. These are meant to be pasted into Turso only
 # when an intentional destructive reset is needed.
 scripts/sql/
+
+# Local environment and SQLite files must never be shipped to Vercel. The app
+# falls back to DATABASE_URL=file:./dev.db when TURSO_DATABASE_URL is absent, so
+# uploading these can make production read a local snapshot instead of Turso.
+.env
+.env.*
+!.env.example
+dev.db
+dev.db-*
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Local build/cache artifacts and design handoff files are not deploy inputs.
+.next/
+tsconfig.tsbuildinfo
+page-designs/
+page-designs

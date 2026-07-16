@@ -16,6 +16,12 @@ function createClient() {
     );
   }
 
+  if (process.env.VERCEL && !url.startsWith("libsql://")) {
+    throw new Error(
+      "Vercel deployments must use TURSO_DATABASE_URL/libsql. Refusing to use a local DATABASE_URL file.",
+    );
+  }
+
   // One adapter, two homes. Local development is a plain SQLite file; a
   // serverless deploy (Vercel) talks to a hosted libSQL/Turso database over the
   // network — a file on disk cannot survive an ephemeral filesystem. The auth
