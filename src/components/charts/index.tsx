@@ -110,7 +110,8 @@ export type ScoreTrendDatum = {
   consistency: number;
 };
 
-/** Score history — the overall score and the three parts it is made of. */
+/** Score history — the Goal Total Score (the headline) alongside the still-tracked
+ *  core-task and consistency curves. */
 export function ScoreTrendChart({
   data,
   title,
@@ -141,18 +142,10 @@ export function ScoreTrendChart({
         />
         <Line
           type="monotone"
-          dataKey="overall"
-          name="Overall"
-          stroke={COLORS.primary}
-          strokeWidth={2.5}
-          dot={false}
-        />
-        <Line
-          type="monotone"
           dataKey="goal"
           name="Goals"
-          stroke={COLORS.emerald}
-          strokeWidth={1.5}
+          stroke={COLORS.primary}
+          strokeWidth={2.5}
           dot={false}
         />
         <Line

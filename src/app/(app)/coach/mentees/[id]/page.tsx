@@ -329,7 +329,7 @@ export default async function MenteeDrilldownPage({
                   <ScoreTrendChart
                     data={trend}
                     title="Score, last 30 days"
-                    description="Overall, and the three parts it is made of."
+                    description="Goal Total Score, core tasks and consistency."
                     height={280}
                   />
                 )}
@@ -359,7 +359,7 @@ export default async function MenteeDrilldownPage({
               <CardHeader>
                 <CardTitle as="h2">Goal Total Score</CardTitle>
                 <CardDescription>
-                  The three categories combined — half of {mentee.firstName}
+                  The three categories combined — this is {mentee.firstName}
                   &apos;s Overall Score. An empty category scores 0 rather than
                   being skipped.
                 </CardDescription>

@@ -62,6 +62,12 @@ export function Modal({
 }: ModalProps) {
   const panel = useRef<HTMLDivElement>(null);
   const restoreFocus = useRef<HTMLElement | null>(null);
+  // Held in a ref so the focus/scroll effect need not depend on `onClose`.
+  // Callers pass an inline `onClose={() => setOpen(false)}` whose identity
+  // changes every render; depending on it would re-run the effect on every
+  // keystroke and its panel-refocus would steal focus out of a controlled
+  // input — which is exactly why you could only type one character.
+  const onCloseRef = useRef(onClose);
   const baseId = useId();
   const titleId = `${baseId}-title`;
   const descId = `${baseId}-desc`;
@@ -96,6 +102,13 @@ export function Modal({
     }
   }, []);
 
+  // Keep the ref current without re-running the focus effect below.
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  // Runs only when the dialog opens or closes — never on an in-dialog re-render,
+  // so typing in a controlled field keeps its focus.
   useEffect(() => {
     if (!open) return;
 
@@ -108,7 +121,7 @@ export function Modal({
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
       } else if (event.key === "Tab") {
         trapTab(event);
       }
@@ -126,7 +139,7 @@ export function Modal({
       document.body.style.overflow = previousOverflow;
       restoreFocus.current?.focus?.();
     };
-  }, [open, onClose, trapTab]);
+  }, [open, trapTab]);
 
   if (!open || !mounted) return null;
 

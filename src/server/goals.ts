@@ -131,7 +131,7 @@ export type GoalSummaryStats = {
   overdue: number;
   /**
    * The Goal Total Score: the three category scores combined, on 0-100. This is
-   * the number that carries 50% of the user's Overall Score.
+   * the user's Overall Score — the three categories are the whole of it.
    */
   goalTotalScore: number;
   byCategory: Record<

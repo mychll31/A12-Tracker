@@ -206,7 +206,7 @@ export default async function AnalyticsPage({
           <ScoreTrendChart
             data={scoreTrend}
             title="Score history"
-            description={`Your overall score and the three parts it is made of, over ${days} days.`}
+            description={`Your Goal Total Score, core tasks and consistency, over ${days} days.`}
           />
         </ChartCard>
 

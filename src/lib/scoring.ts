@@ -326,6 +326,8 @@ export async function computeScoresForUsers(
     );
 
     // --- overall ---
+    // With the current weights the Goal Total Score carries the whole of this;
+    // core tasks and consistency are computed above for display but score 0.
     const overallScore = round(
       goalScore * SCORE_WEIGHTS.goals +
         taskCompletionRate * SCORE_WEIGHTS.coreTasks +

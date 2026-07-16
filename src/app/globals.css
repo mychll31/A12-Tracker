@@ -9,6 +9,21 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
+ * Native controls (date pickers, spinners, scrollbars) follow `color-scheme`.
+ * Without it, a dark theme still gets the light UA glyphs — which is why the
+ * calendar icon on `<input type="date">` was a dark glyph, invisible on the
+ * dark field. Setting it per theme (in :root/.dark below) makes that icon a
+ * light glyph on dark.
+ */
+input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.85;
+}
+input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/*
  * Abundance 12.
  *
  * The application wears the same brand as the landing page: deep navy, gold, and
@@ -21,6 +36,7 @@
  * gold still reads as gold instead of turning to mustard on a grey field.
  */
 :root {
+  color-scheme: light;
   --surface: #f6f1e4;
   --surface-raised: #fffdf7;
   --surface-sunken: #ece4d1;
@@ -45,6 +61,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --surface: #080c1c;
   --surface-raised: #0d1330;
   --surface-sunken: #060916;

@@ -88,14 +88,16 @@ export const PLAN_STATUS_WEIGHT: Record<ActionPlanStatus, number> = {
 // ---------------------------------------------------------------------------
 
 /**
- * Weights for the Overall Score. They sum to 1, so the overall score lands on
- * the same 0-100 scale as its components and stays directly comparable across
- * users, groups and the organization.
+ * Weights for the Overall Score. The Overall Score IS the Goal Total Score — the
+ * three goal categories are the whole of it. Core tasks and consistency are
+ * still tracked and shown to the mentee, but they no longer move any score. The
+ * weights still sum to 1 and live here so the blend can be re-tuned later
+ * without touching the scoring engine.
  */
 export const SCORE_WEIGHTS = {
-  goals: 0.5, // the three goal categories, combined
-  coreTasks: 0.3, // daily discipline
-  consistency: 0.2, // streaks and check-in cadence
+  goals: 1, // the three goal categories are the entire Overall Score
+  coreTasks: 0, // tracked, but not scored
+  consistency: 0, // tracked, but not scored
 } as const;
 
 /** Within the goal half of the score, each category pulls equal weight. */

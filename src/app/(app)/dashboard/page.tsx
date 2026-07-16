@@ -366,7 +366,8 @@ export default async function DashboardPage() {
         <CardHeader>
           <CardTitle as="h2">Personal analytics</CardTitle>
           <CardDescription>
-            Your overall score and its three parts, over the last 30 days.
+            Your Goal Total Score, core tasks and consistency, over the last 30
+            days.
           </CardDescription>
         </CardHeader>
         <CardContent>

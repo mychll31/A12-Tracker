@@ -95,8 +95,8 @@ export default async function GoalsPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">My goals</h1>
           <p className="mt-1.5 text-sm text-muted">
-            Personal, professional and contribution — half your overall score
-            lives here.
+            Personal, professional and contribution — combined into your Goal
+            Total Score.
           </p>
         </div>
         <NewGoalDialog />
@@ -145,8 +145,8 @@ export default async function GoalsPage({
             Goal Total Score
           </p>
           <p className="text-xs leading-relaxed text-muted">
-            Your three categories combined — and it carries 50% of your Overall
-            Score.
+            Your Personal, Professional and Contribution scores, combined into
+            one out of 100.
           </p>
         </Card>
 
