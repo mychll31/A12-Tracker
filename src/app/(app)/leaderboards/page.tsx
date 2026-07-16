@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Trophy } from "lucide-react";
+import { Crown, Trophy } from "lucide-react";
 
 import { Avatar, Badge, Card, EmptyState } from "@/components/ui";
+import {
+  RankMedalImage,
+  RANK_BAR,
+  RANK_TEXT,
+} from "@/components/ui/rank-medal";
 import { requireUser } from "@/lib/auth";
 import {
   LEADERBOARD_DESCRIPTIONS,
+  rankForPercent,
   type LeaderboardBoard,
 } from "@/lib/domain";
 import { cn, formatScore, ordinal, scoreTone, TONE_TEXT } from "@/lib/utils";
@@ -91,7 +97,12 @@ function DeltaChip({ delta }: { delta: number | null }) {
 }
 
 function Row({ row, board }: { row: LeaderboardRow; board: LeaderboardBoard }) {
-  const toned = SCORE_SCALE.has(board);
+  // The illustrated tier medal + progress bar only make sense on the 0-100 score
+  // boards; the count boards (goals completed, streak days) keep the plainer
+  // secondary-value layout.
+  const isScoreBoard = SCORE_SCALE.has(board);
+  const rank = isScoreBoard ? rankForPercent(row.score) : null;
+  const pct = Math.min(100, Math.max(0, row.score));
 
   return (
     <li
@@ -126,19 +137,70 @@ function Row({ row, board }: { row: LeaderboardRow; board: LeaderboardBoard }) {
         ) : null}
       </div>
 
-      <div className="hidden w-20 shrink-0 text-right text-xs text-muted sm:block">
-        {row.secondary}
-      </div>
+      {rank ? (
+        <div className="hidden w-44 shrink-0 items-center gap-2 md:flex">
+          <RankMedalImage score={row.score} size={40} />
+          <div className="min-w-0">
+            <p
+              className={cn(
+                "truncate text-sm font-semibold leading-tight",
+                RANK_TEXT[rank.key],
+              )}
+            >
+              {rank.name}
+            </p>
+            <p className="text-[0.6875rem] tabular-nums text-muted">
+              {rank.min}–{rank.max}%
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="hidden w-20 shrink-0 text-right text-xs text-muted sm:block">
+          {row.secondary}
+        </div>
+      )}
+
+      {rank ? (
+        <div className="hidden w-40 shrink-0 items-center gap-2 lg:flex">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-sunken">
+            <div
+              className={cn("h-full rounded-full", RANK_BAR[rank.key])}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span
+            className={cn(
+              "w-9 shrink-0 text-right text-xs font-semibold tabular-nums",
+              RANK_TEXT[rank.key],
+            )}
+          >
+            {Math.round(pct)}%
+          </span>
+        </div>
+      ) : null}
 
       <div className="w-10 shrink-0 text-right">
         <DeltaChip delta={row.delta} />
       </div>
 
-      <div className="w-16 shrink-0 text-right">
+      <div className="flex w-16 shrink-0 items-center justify-end gap-1.5">
+        {row.rank <= 3 ? (
+          <Crown
+            className={cn(
+              "size-4 shrink-0",
+              row.rank === 1
+                ? "text-amber-400"
+                : row.rank === 2
+                  ? "text-slate-400"
+                  : "text-amber-700 dark:text-amber-600",
+            )}
+            aria-hidden="true"
+          />
+        ) : null}
         <span
           className={cn(
             "text-xl font-semibold tabular-nums tracking-tight",
-            toned ? TONE_TEXT[scoreTone(row.score)] : "text-foreground",
+            isScoreBoard ? TONE_TEXT[scoreTone(row.score)] : "text-foreground",
           )}
         >
           {formatScore(row.score)}

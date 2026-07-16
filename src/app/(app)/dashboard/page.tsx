@@ -3,21 +3,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   AlertTriangle,
-  ArrowRight,
   Award,
   CalendarClock,
-  CheckCircle2,
-  CircleCheckBig,
   Flame,
   MessageSquareQuote,
-  NotebookPen,
   Target,
   Trophy,
 } from "lucide-react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -27,18 +22,18 @@ import {
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProgressBar, ScoreRing } from "@/components/ui/progress";
+import { RankMedalImage, RANK_TEXT } from "@/components/ui/rank-medal";
 import { StatCard } from "@/components/ui/stat";
 import { ScoreTrendChart } from "@/components/charts";
 import { requireUser } from "@/lib/auth";
-import { formatDate, formatRelative, isoDay, today } from "@/lib/dates";
-import { GOAL_CATEGORY_KEYS } from "@/lib/domain";
+import { formatDate, formatRelative } from "@/lib/dates";
+import { GOAL_CATEGORY_KEYS, rankForPercent } from "@/lib/domain";
 import { cn, formatScore, ordinal, scoreTone, TONE_TEXT } from "@/lib/utils";
 import { getMenteeDashboard } from "@/server/dashboard";
 import { goalSummaryFor } from "@/server/goals";
 
 import { GOAL_CATEGORY_LABELS } from "../goals/categories";
 import { TaskIcon } from "./lucide-icon";
-import { TodayTasks } from "./today-tasks";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -55,8 +50,7 @@ export default async function DashboardPage() {
     getMenteeDashboard(user),
     goalSummaryFor(user.id),
   ]);
-  const { score, todayTasks, goals } = dash;
-  const day = isoDay(today());
+  const { score, goals } = dash;
 
   return (
     <div className="animate-slide-up flex flex-col gap-8">
@@ -65,24 +59,45 @@ export default async function DashboardPage() {
           Welcome back, {user.firstName}
         </h1>
         <p className="mt-1.5 text-sm text-muted">
-          Your goals, your daily disciplines, and the score that proves you
-          showed up.
+          Your goals across all three categories, and the Goal Total Score they
+          add up to.
         </p>
       </header>
 
       <section className="grid gap-4 lg:grid-cols-[auto_1fr] [&>*]:min-w-0">
         <Card className="flex flex-col items-center justify-center gap-3 p-6 lg:w-64">
           <ScoreRing
-            score={score.overallScore}
+            score={goalStats.goalTotalScore}
             size={144}
             strokeWidth={12}
-            label="Overall score"
-            sublabel="Overall"
+            label="Goal Total Score"
+            sublabel="of 100"
           />
+          <div className="flex items-center gap-2">
+            <RankMedalImage score={goalStats.goalTotalScore} size={44} />
+            <div className="leading-tight">
+              <p
+                className={cn(
+                  "text-sm font-semibold",
+                  RANK_TEXT[rankForPercent(goalStats.goalTotalScore).key],
+                )}
+              >
+                {rankForPercent(goalStats.goalTotalScore).name}
+              </p>
+              <p className="text-xs tabular-nums text-muted">
+                {rankForPercent(goalStats.goalTotalScore).min}–
+                {rankForPercent(goalStats.goalTotalScore).max}%
+              </p>
+            </div>
+          </div>
           <p className="text-center text-xs leading-relaxed text-muted">
-            Goals {formatScore(score.goalScore)} · Core tasks{" "}
-            {formatScore(score.coreTaskScore)} · Consistency{" "}
-            {formatScore(score.consistencyScore)}
+            {GOAL_CATEGORY_KEYS.map((key, i) => (
+              <span key={key}>
+                {i > 0 ? " · " : ""}
+                {GOAL_CATEGORY_LABELS[key]}{" "}
+                {formatScore(goalStats.byCategory[key].score)}
+              </span>
+            ))}
           </p>
         </Card>
 
@@ -130,110 +145,13 @@ export default async function DashboardPage() {
               </>
             }
           />
-          <StatCard
-            label="Core task completion"
-            icon={CircleCheckBig}
-            href="/core-tasks"
-            tone={scoreTone(score.taskCompletionRate)}
-            value={`${formatScore(score.taskCompletionRate)}%`}
-          />
         </div>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle as="h2">Today&apos;s core tasks</CardTitle>
-            <CardDescription>
-              {todayTasks.completed} of {todayTasks.total} done —{" "}
-              {todayTasks.percent}% of today&apos;s discipline.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {todayTasks.items.length ? (
-              <>
-                <ProgressBar
-                  value={todayTasks.percent}
-                  showValue={false}
-                  size="sm"
-                  className="mb-4"
-                />
-                <TodayTasks
-                  userId={user.id}
-                  date={day}
-                  items={todayTasks.items.map((item) => ({
-                    taskId: item.id,
-                    name: item.name,
-                    icon: item.icon,
-                    completed: item.completed,
-                  }))}
-                />
-              </>
-            ) : (
-              <EmptyState
-                icon={CircleCheckBig}
-                title="No core tasks yet"
-                description="Your organization hasn't set up the daily disciplines. Ask your coach."
-              />
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle as="h2">Daily check-in</CardTitle>
-            <CardDescription>
-              {formatDate(today())} — wins, challenges, gratitude.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col justify-center">
-            {dash.hasCheckedInToday ? (
-              <div className="flex flex-col items-center gap-3 text-center">
-                <span className="grid size-12 place-items-center rounded-full bg-emerald-500/10">
-                  <CheckCircle2
-                    className="size-6 text-emerald-500"
-                    aria-hidden="true"
-                  />
-                </span>
-                <p className="text-sm font-medium">Checked in for today</p>
-                <p className="text-xs text-muted">
-                  Something to add? The form saves over today&apos;s entry.
-                </p>
-                <Link href="/check-in" className="inline-flex">
-                  <Button variant="secondary" size="sm" tabIndex={-1}>
-                    View or edit
-                  </Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-3 text-center">
-                <span className="grid size-12 place-items-center rounded-full bg-primary-soft">
-                  <NotebookPen
-                    className="size-6 text-primary"
-                    aria-hidden="true"
-                  />
-                </span>
-                <p className="text-sm font-medium">
-                  You haven&apos;t checked in today
-                </p>
-                <p className="text-xs text-muted">
-                  Two minutes. It feeds your consistency score.
-                </p>
-                <Link href="/check-in" className="inline-flex">
-                  <Button icon={<ArrowRight />} tabIndex={-1}>
-                    Start today&apos;s check-in
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </section>
 
       <section className="flex flex-col gap-4">
         <div className="flex items-baseline justify-between gap-4">
           <h2 className="text-lg font-semibold tracking-tight">
-            Goal Total Score
+            Goals by category
           </h2>
           <Link
             href="/goals"
@@ -268,19 +186,7 @@ export default async function DashboardPage() {
           </Link>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 [&>*]:min-w-0">
-          <Card className="flex flex-col items-center justify-center gap-3 p-5 text-center">
-            <ScoreRing
-              score={goalStats.goalTotalScore}
-              size={120}
-              label="Goal Total Score"
-              sublabel="of 100"
-            />
-            <p className="text-xs leading-relaxed text-muted">
-              The three categories combined — half of your Overall Score.
-            </p>
-          </Card>
-
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
           {GOAL_CATEGORY_KEYS.map((key) => {
             const row = goalStats.byCategory[key];
             const empty = row.total === 0;

@@ -16,6 +16,7 @@ import {
   ScoreRing,
   Select,
 } from "@/components/ui";
+import { RankMedalImage } from "@/components/ui/rank-medal";
 
 export const metadata: Metadata = { title: "Mentees" };
 
@@ -72,7 +73,10 @@ function MenteeGridCard({
           </p>
         </div>
 
-        <ScoreRing score={mentee.overallScore} size={52} strokeWidth={5} />
+        <div className="flex items-center gap-2">
+          <RankMedalImage score={mentee.overallScore} size={40} />
+          <ScoreRing score={mentee.overallScore} size={52} strokeWidth={5} />
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2 border-t border-border pt-3 text-center">

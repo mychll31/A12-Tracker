@@ -20,7 +20,7 @@
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
     "setup": "prisma migrate deploy && prisma generate && prisma db seed",
-    "vercel-build": "prisma generate && next build",
+    "vercel-build": "node scripts/patch-turso-schema.mjs && prisma generate && next build",
     "postinstall": "prisma generate",
     "db:turso": "node scripts/migrate-turso.mjs"
   },
