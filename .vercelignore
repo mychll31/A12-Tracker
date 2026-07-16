@@ -1,0 +1,3 @@
+# Manual database reset scripts. These are meant to be pasted into Turso only
+# when an intentional destructive reset is needed.
+scripts/sql/

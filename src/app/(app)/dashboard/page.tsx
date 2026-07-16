@@ -101,7 +101,7 @@ export default async function DashboardPage() {
           </p>
         </Card>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid content-start gap-4 sm:grid-cols-2">
           <StatCard
             label="Current streak"
             icon={Flame}

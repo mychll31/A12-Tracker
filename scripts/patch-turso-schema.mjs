@@ -69,6 +69,10 @@ await client.execute(`
   ON "merit_logs"("goalId", "date")
 `);
 
+// One-time backfill, guarded so it only runs the first time the column is
+// added. NEVER add unconditional data UPDATEs here — this script runs on every
+// deploy, so an `UPDATE ... WHERE targetValue = 0` would rewrite every Milestone
+// goal (which legitimately has targetValue 0) on each build.
 if (addedTargetPeriod) {
   await client.execute(`
     UPDATE "goals"
@@ -76,22 +80,6 @@ if (addedTargetPeriod) {
     WHERE "goalType" = 'MERIT'
   `);
 }
-
-await client.execute(`
-  UPDATE "goals"
-  SET "targetValue" = 100,
-      "currentValue" = "progress"
-  WHERE "targetValue" = 0
-`);
-
-await client.execute(`
-  UPDATE "goal_tasks"
-  SET "status" = CASE
-    WHEN "isComplete" THEN 'DONE'
-    ELSE 'NOT_STARTED'
-  END
-  WHERE "status" = 'NOT_STARTED'
-`);
 
 client.close();
 console.log("patch-turso-schema: complete.");
