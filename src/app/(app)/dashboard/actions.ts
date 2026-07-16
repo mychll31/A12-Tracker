@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { ForbiddenError } from "@/lib/rbac";
 import { toggleCoreTask } from "@/server/core-tasks";
+import { goExtraMile, logMeritTarget } from "@/server/goals";
 
 export type ToggleTaskResult = { error: string | null };
 
@@ -64,5 +65,58 @@ export async function toggleTask(
   revalidatePath("/dashboard");
   revalidatePath("/core-tasks");
 
+  return { error: null };
+}
+
+const meritSchema = z.object({ goalId: z.string().min(1, "Missing goal.") });
+const extraSchema = z.object({
+  goalId: z.string().min(1, "Missing goal."),
+  amount: z.coerce.number().min(0).max(1_000_000_000),
+});
+
+function revalidateMerit() {
+  revalidatePath("/core-tasks");
+  revalidatePath("/goals");
+  revalidatePath("/dashboard");
+}
+
+/** Logs the current period's target for a merit goal (the Core Tasks check). */
+export async function logMeritTargetAction(
+  formData: FormData,
+): Promise<ToggleTaskResult> {
+  const actor = await requireUser();
+  const parsed = meritSchema.safeParse({ goalId: formData.get("goalId") });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  try {
+    await logMeritTarget(actor, parsed.data.goalId);
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { error: error.message };
+    throw error;
+  }
+
+  revalidateMerit();
+  return { error: null };
+}
+
+/** Logs a custom "go the extra mile" amount on a merit goal. */
+export async function goExtraMileAction(
+  formData: FormData,
+): Promise<ToggleTaskResult> {
+  const actor = await requireUser();
+  const parsed = extraSchema.safeParse({
+    goalId: formData.get("goalId"),
+    amount: formData.get("amount"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  try {
+    await goExtraMile(actor, parsed.data.goalId, parsed.data.amount);
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { error: error.message };
+    throw error;
+  }
+
+  revalidateMerit();
   return { error: null };
 }

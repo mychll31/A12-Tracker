@@ -73,15 +73,100 @@ export const ACTION_PLAN_STATUS_LABELS: Record<ActionPlanStatus, string> = {
 };
 
 /**
- * How much each status counts toward a goal's *informational* action-plan
- * completion figure. This is shown next to a goal but never folded into the
- * goal score, which is the numeric measure alone.
+ * How much each action-plan status counts, 0-100. For a MILESTONE goal the
+ * average of these weights across its plans IS the goal score. For a MERIT goal
+ * the plans are informational and this figure is shown but never folded into the
+ * score, which is the numeric measure alone.
  */
 export const PLAN_STATUS_WEIGHT: Record<ActionPlanStatus, number> = {
   NOT_STARTED: 0,
   IN_PROGRESS: 50,
   DONE: 100,
 };
+
+/**
+ * A goal is one of two kinds:
+ *   MERIT     — a numeric measure chipped away over time (current ÷ target),
+ *               optionally with a recurring per-period target (see TARGET_PERIODS).
+ *   MILESTONE — scored by its action plans (the average of PLAN_STATUS_WEIGHT),
+ *               with no numeric measure.
+ */
+export const GOAL_TYPES = ["MERIT", "MILESTONE"] as const;
+export type GoalType = (typeof GOAL_TYPES)[number];
+
+export const GOAL_TYPE_LABELS: Record<GoalType, string> = {
+  MERIT: "Merit",
+  MILESTONE: "Milestone",
+};
+
+/**
+ * A MERIT goal's cadence. Its per-period target recurs this often between the
+ * start and the target date; NONE means no recurring task — the current value is
+ * edited by hand.
+ */
+export const TARGET_PERIODS = [
+  "NONE",
+  "DAILY",
+  "EVERY_2",
+  "EVERY_3",
+  "EVERY_4",
+  "EVERY_5",
+  "EVERY_6",
+  "WEEKLY",
+] as const;
+export type TargetPeriod = (typeof TARGET_PERIODS)[number];
+
+/** How many days one period spans. NONE has no cadence. */
+export const PERIOD_DAYS: Record<TargetPeriod, number> = {
+  NONE: 0,
+  DAILY: 1,
+  EVERY_2: 2,
+  EVERY_3: 3,
+  EVERY_4: 4,
+  EVERY_5: 5,
+  EVERY_6: 6,
+  WEEKLY: 7,
+};
+
+export const TARGET_PERIOD_LABELS: Record<TargetPeriod, string> = {
+  NONE: "No recurring target",
+  DAILY: "Daily",
+  EVERY_2: "Every 2 days",
+  EVERY_3: "Every 3 days",
+  EVERY_4: "Every 4 days",
+  EVERY_5: "Every 5 days",
+  EVERY_6: "Every 6 days",
+  WEEKLY: "Weekly",
+};
+
+/**
+ * How many whole periods of length `periodDays` fit in `daysRemaining` — at
+ * least one, so a target due sooner than a full period still has something to
+ * aim at.
+ */
+export function periodsRemaining(
+  daysRemaining: number,
+  periodDays: number,
+): number {
+  if (periodDays <= 0) return 0;
+  return Math.max(1, Math.floor(daysRemaining / periodDays));
+}
+
+/**
+ * The amount a MERIT goal should log each period to close the gap from `current`
+ * to `target` by the target date. Rounded to two decimals for a clean label.
+ */
+export function perPeriodTarget(
+  target: number,
+  current: number,
+  daysRemaining: number,
+  periodDays: number,
+): number {
+  const periods = periodsRemaining(daysRemaining, periodDays);
+  if (periods <= 0) return 0;
+  const remaining = Math.max(0, target - current);
+  return Math.round((remaining / periods) * 100) / 100;
+}
 
 // ---------------------------------------------------------------------------
 // Scoring
@@ -288,6 +373,10 @@ function narrow<T extends string>(
 export const asRoleKey = (v: string) => narrow(ROLE_KEYS, v, "MENTEE");
 export const asGoalStatus = (v: string) =>
   narrow(GOAL_STATUSES, v, "NOT_STARTED");
+export const asGoalType = (v: string) => narrow(GOAL_TYPES, v, "MERIT");
+export const asTargetPeriod = (v: string) => narrow(TARGET_PERIODS, v, "NONE");
+export const asActionPlanStatus = (v: string) =>
+  narrow(ACTION_PLAN_STATUSES, v, "NOT_STARTED");
 export const asGoalCategoryKey = (v: string) =>
   narrow(GOAL_CATEGORY_KEYS, v, "PERSONAL");
 export const asBoard = (v: string) => narrow(LEADERBOARD_BOARDS, v, "GROUP");

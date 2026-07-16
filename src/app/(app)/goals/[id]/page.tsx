@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ProgressBar, ScoreRing } from "@/components/ui/progress";
 import { requireUser } from "@/lib/auth";
 import { formatDate, formatRelative, isoDay } from "@/lib/dates";
+import { TARGET_PERIOD_LABELS } from "@/lib/domain";
 import { ForbiddenError } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
 import { getGoal, type GoalDetail } from "@/server/goals";
@@ -104,9 +105,17 @@ export default async function GoalDetailPage({
             <StatusBadge status={goal.status} />
             <GoalScoreBadge score={goal.score} size="md" />
             <GoalRankMedal score={goal.score} size="md" />
-            {goal.targetValue > 0 ? (
+            {goal.goalType === "MILESTONE" ? (
+              <Badge variant="neutral">Milestone</Badge>
+            ) : goal.targetValue > 0 ? (
               <Badge variant="neutral">
                 {goal.direction === "LOSE" ? "Lose" : "Gain"} {goal.targetValue}
+                {goal.unit ? ` ${goal.unit}` : ""}
+              </Badge>
+            ) : null}
+            {goal.goalType === "MERIT" && goal.targetPeriod !== "NONE" ? (
+              <Badge variant="info">
+                {TARGET_PERIOD_LABELS[goal.targetPeriod]} · {goal.periodTarget}
                 {goal.unit ? ` ${goal.unit}` : ""}
               </Badge>
             ) : null}
@@ -138,6 +147,8 @@ export default async function GoalDetailPage({
             notes: goal.notes,
             status: goal.status,
             targetDate: isoDay(goal.targetDate),
+            goalType: goal.goalType,
+            targetPeriod: goal.targetPeriod,
             direction: goal.direction,
             targetValue: goal.targetValue,
             currentValue: goal.currentValue,
@@ -154,7 +165,9 @@ export default async function GoalDetailPage({
               <CardDescription>
                 {goal.score === null
                   ? "This goal is abandoned — withdrawn from your scores rather than counted as a zero."
-                  : "How far your current value has come toward the target."}
+                  : goal.goalType === "MILESTONE"
+                    ? "How far your action plans are done — in progress counts half."
+                    : "How far your current value has come toward the target."}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-6">
@@ -177,14 +190,32 @@ export default async function GoalDetailPage({
                   />
                 )}
 
-                <MeasureControl
-                  goalId={goal.id}
-                  direction={goal.direction}
-                  targetValue={goal.targetValue}
-                  currentValue={goal.currentValue}
-                  unit={goal.unit}
-                  progress={goal.progress}
-                />
+                {goal.goalType === "MILESTONE" ? (
+                  <div className="w-full min-w-0 flex-1">
+                    <p className="text-sm text-muted">
+                      Scored by the action plans below — currently{" "}
+                      <span className="font-semibold text-foreground">
+                        {goal.planCompletion}%
+                      </span>{" "}
+                      done. Move a plan to done (or in progress) and the score
+                      follows.
+                    </p>
+                    <ProgressBar
+                      value={goal.score ?? 0}
+                      showValue={false}
+                      className="mt-3"
+                    />
+                  </div>
+                ) : (
+                  <MeasureControl
+                    goalId={goal.id}
+                    direction={goal.direction}
+                    targetValue={goal.targetValue}
+                    currentValue={goal.currentValue}
+                    unit={goal.unit}
+                    progress={goal.progress}
+                  />
+                )}
               </div>
 
               <dl className="grid grid-cols-2 gap-4 border-t border-border pt-4 text-sm sm:grid-cols-4">
@@ -246,9 +277,9 @@ export default async function GoalDetailPage({
             <CardHeader>
               <CardTitle as="h2">Action Plans</CardTitle>
               <CardDescription>
-                The steps toward this goal. Click a status to move it between not
-                started, in progress and done — shown here, but the score comes
-                from the measure above.
+                {goal.goalType === "MILESTONE"
+                  ? "These plans are the goal — its score is how far they're done. Click a status to move it between not started, in progress and done."
+                  : "The steps toward this goal. Click a status to move it between not started, in progress and done — shown here, but the score comes from the measure above."}
               </CardDescription>
             </CardHeader>
             <CardContent>

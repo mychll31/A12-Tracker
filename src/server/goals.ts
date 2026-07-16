@@ -11,16 +11,22 @@ import {
   ACTION_PLAN_STATUSES,
   GOAL_CATEGORY_KEYS,
   GOAL_DIRECTIONS,
+  PERIOD_DAYS,
   PLAN_STATUS_WEIGHT,
   asGoalCategoryKey,
   asGoalStatus,
+  asGoalType,
+  asTargetPeriod,
+  perPeriodTarget,
   type ActionPlanStatus,
   type GoalCategoryKey,
   type GoalDirection,
   type GoalStatus,
+  type GoalType,
+  type TargetPeriod,
 } from "@/lib/domain";
 import { scoreCategories, scoreGoal, weightGoalScore } from "@/lib/scoring";
-import { daysUntil } from "@/lib/dates";
+import { addDays, dayKey, daysUntil, today } from "@/lib/dates";
 import { logActivity } from "@/server/activity";
 
 /**
@@ -95,6 +101,12 @@ export type GoalSummary = {
   targetDate: Date;
   completedAt: Date | null;
   category: GoalCategoryRef;
+  /** MERIT scores by the measure; MILESTONE scores by its action plans. */
+  goalType: GoalType;
+  /** For a MERIT goal, how often its per-period target recurs (NONE = manual). */
+  targetPeriod: TargetPeriod;
+  /** For a periodic MERIT goal, the amount to log this period (0 otherwise). */
+  periodTarget: number;
   /** The measurable target that drives the score. */
   direction: GoalDirection;
   targetValue: number;
@@ -229,6 +241,8 @@ type GoalRowForSummary = {
   description: string | null;
   status: string;
   progress: number;
+  goalType: string;
+  targetPeriod: string;
   direction: string;
   targetValue: number;
   currentValue: number;
@@ -242,6 +256,21 @@ type GoalRowForSummary = {
 
 function toSummary(goal: GoalRowForSummary): GoalSummary {
   const status = asGoalStatus(goal.status);
+  const goalType = asGoalType(goal.goalType);
+  const targetPeriod = asTargetPeriod(goal.targetPeriod);
+
+  // A periodic MERIT goal's per-period target: the remaining gap spread over the
+  // periods left until the target date.
+  const periodTarget =
+    goalType === "MERIT" && targetPeriod !== "NONE"
+      ? perPeriodTarget(
+          goal.targetValue,
+          goal.currentValue,
+          daysUntil(goal.targetDate),
+          PERIOD_DAYS[targetPeriod],
+        )
+      : 0;
+
   return {
     id: goal.id,
     userId: goal.userId,
@@ -253,6 +282,9 @@ function toSummary(goal: GoalRowForSummary): GoalSummary {
     targetDate: goal.targetDate,
     completedAt: goal.completedAt,
     category: toCategoryRef(goal.category),
+    goalType,
+    targetPeriod,
+    periodTarget,
     direction: asDirection(goal.direction),
     targetValue: goal.targetValue,
     currentValue: goal.currentValue,
@@ -267,8 +299,10 @@ function toSummary(goal: GoalRowForSummary): GoalSummary {
       status: goal.status,
       progress: goal.progress,
       categoryKey: goal.category.key,
+      goalType: goal.goalType,
       targetValue: goal.targetValue,
       currentValue: goal.currentValue,
+      tasks: goal.tasks,
     }),
     daysUntilDue: daysUntil(goal.targetDate),
     isOverdue: isOverdueGoal(goal.targetDate, status),
@@ -396,10 +430,12 @@ export async function goalSummaryFor(
     select: {
       status: true,
       progress: true,
+      goalType: true,
       targetDate: true,
       targetValue: true,
       currentValue: true,
       category: { select: { key: true } },
+      tasks: { select: { status: true } },
     },
   });
 
@@ -410,8 +446,10 @@ export async function goalSummaryFor(
     status: g.status,
     progress: g.progress,
     categoryKey: g.category.key,
+    goalType: g.goalType,
     targetValue: g.targetValue,
     currentValue: g.currentValue,
+    tasks: g.tasks,
   }));
   const categoryScores = scoreCategories(scorable);
   const goalTotalScore = weightGoalScore(categoryScores);
@@ -485,6 +523,8 @@ export async function createGoal(
     targetValue?: number;
     currentValue?: number;
     unit?: string;
+    goalType?: GoalType;
+    targetPeriod?: TargetPeriod;
     tasks?: string[];
   },
 ): Promise<string> {
@@ -498,8 +538,14 @@ export async function createGoal(
     throw new Error(`Unknown goal category: ${input.categoryKey}`);
   }
 
-  const targetValue = Math.max(0, input.targetValue ?? 0);
-  const currentValue = Math.max(0, input.currentValue ?? 0);
+  const goalType = asGoalType(input.goalType ?? "MERIT");
+  const isMilestone = goalType === "MILESTONE";
+  // A milestone goal has no numeric measure — its plans are the score.
+  const targetValue = isMilestone ? 0 : Math.max(0, input.targetValue ?? 0);
+  const currentValue = isMilestone ? 0 : Math.max(0, input.currentValue ?? 0);
+  const targetPeriod: TargetPeriod = isMilestone
+    ? "NONE"
+    : asTargetPeriod(input.targetPeriod ?? "NONE");
 
   const planTitles = (input.tasks ?? [])
     .map((t) => t.trim())
@@ -514,12 +560,14 @@ export async function createGoal(
       targetDate: input.targetDate,
       notes: input.notes ?? null,
       status: "NOT_STARTED",
-      direction: input.direction ?? "GAIN",
+      goalType,
+      targetPeriod,
+      direction: isMilestone ? "GAIN" : (input.direction ?? "GAIN"),
       targetValue,
       currentValue,
-      unit: input.unit?.trim() ?? "",
-      // The stored bar mirrors the measure.
-      progress: measurePct(targetValue, currentValue, 0),
+      unit: isMilestone ? "" : (input.unit?.trim() ?? ""),
+      // MERIT mirrors its measure; a fresh MILESTONE has no plans done yet, so 0.
+      progress: isMilestone ? 0 : measurePct(targetValue, currentValue, 0),
       tasks: {
         create: planTitles.map((title, index) => ({
           title,
@@ -559,6 +607,8 @@ export async function updateGoal(
     targetValue?: number;
     currentValue?: number;
     unit?: string;
+    goalType?: GoalType;
+    targetPeriod?: TargetPeriod;
   },
 ): Promise<void> {
   const goal = await loadGoalOrThrow(goalId);
@@ -568,20 +618,39 @@ export async function updateGoal(
   const statusTo = input.status ?? statusFrom;
   const progressFrom = goal.progress;
 
-  const targetValue =
-    input.targetValue !== undefined
+  const goalType = asGoalType(input.goalType ?? goal.goalType);
+  const isMilestone = goalType === "MILESTONE";
+  const targetPeriod: TargetPeriod = isMilestone
+    ? "NONE"
+    : asTargetPeriod(input.targetPeriod ?? goal.targetPeriod);
+
+  const targetValue = isMilestone
+    ? 0
+    : input.targetValue !== undefined
       ? Math.max(0, input.targetValue)
       : goal.targetValue;
-  const currentValue =
-    input.currentValue !== undefined
+  const currentValue = isMilestone
+    ? 0
+    : input.currentValue !== undefined
       ? Math.max(0, input.currentValue)
       : goal.currentValue;
 
-  // The bar mirrors the measure; marking the goal done pins it to 100.
-  let progressTo = measurePct(targetValue, currentValue, progressFrom);
+  // Progress mirrors the score: the measure for MERIT, plan completion for
+  // MILESTONE, pinned to 100 when the goal is marked complete.
   const completing = statusTo === "COMPLETED" && statusFrom !== "COMPLETED";
   const reopening = statusFrom === "COMPLETED" && statusTo !== "COMPLETED";
-  if (statusTo === "COMPLETED") progressTo = 100;
+  let progressTo: number;
+  if (statusTo === "COMPLETED") {
+    progressTo = 100;
+  } else if (isMilestone) {
+    const plans = await db.goalTask.findMany({
+      where: { goalId },
+      select: { status: true },
+    });
+    progressTo = planCompletionOf(plans);
+  } else {
+    progressTo = measurePct(targetValue, currentValue, progressFrom);
+  }
 
   await db.goal.update({
     where: { id: goalId },
@@ -594,8 +663,14 @@ export async function updateGoal(
         ? { targetDate: input.targetDate }
         : {}),
       ...(input.notes !== undefined ? { notes: input.notes } : {}),
-      ...(input.direction !== undefined ? { direction: input.direction } : {}),
-      ...(input.unit !== undefined ? { unit: input.unit.trim() } : {}),
+      ...(input.direction !== undefined && !isMilestone
+        ? { direction: input.direction }
+        : {}),
+      ...(input.unit !== undefined && !isMilestone
+        ? { unit: input.unit.trim() }
+        : {}),
+      goalType,
+      targetPeriod,
       targetValue,
       currentValue,
       status: statusTo,
@@ -746,6 +821,29 @@ async function loadPlanOrThrow(goalTaskId: string) {
   return task;
 }
 
+/**
+ * A MILESTONE goal is scored by its plans, so any plan change re-mirrors its
+ * progress column. A MERIT goal's score is its measure, so it is left untouched.
+ */
+async function remirrorMilestone(goalId: string): Promise<void> {
+  const goal = await db.goal.findUnique({
+    where: { id: goalId },
+    select: { goalType: true, status: true },
+  });
+  if (!goal || asGoalType(goal.goalType) !== "MILESTONE") return;
+  const status = asGoalStatus(goal.status);
+  if (status === "COMPLETED" || status === "ABANDONED") return;
+
+  const plans = await db.goalTask.findMany({
+    where: { goalId },
+    select: { status: true },
+  });
+  await db.goal.update({
+    where: { id: goalId },
+    data: { progress: planCompletionOf(plans) },
+  });
+}
+
 export async function addActionPlan(
   actor: SessionUser,
   goalId: string,
@@ -758,7 +856,7 @@ export async function addActionPlan(
   await db.goalTask.create({
     data: { goalId, title: title.trim(), sortOrder: count },
   });
-  // No recompute: action-plan completion never feeds the goal score.
+  await remirrorMilestone(goalId);
 }
 
 export async function setActionPlanStatus(
@@ -778,7 +876,9 @@ export async function setActionPlanStatus(
       completedAt: done ? (task.completedAt ?? new Date()) : null,
     },
   });
-  // No recompute: the goal score is the numeric measure, not the plans.
+  // For a MILESTONE goal the plans ARE the score, so re-mirror it; for a MERIT
+  // goal remirrorMilestone is a no-op and the numeric measure stands.
+  await remirrorMilestone(task.goalId);
 }
 
 export async function deleteActionPlan(
@@ -788,6 +888,202 @@ export async function deleteActionPlan(
   const task = await loadPlanOrThrow(goalTaskId);
   await assertCanEditMentee(actor, task.goal.userId);
   await db.goalTask.delete({ where: { id: goalTaskId } });
+  await remirrorMilestone(task.goalId);
+}
+
+// ---------------------------------------------------------------------------
+// Merit periodic logging
+// ---------------------------------------------------------------------------
+
+/** Has this MERIT goal been logged within its current period window? */
+async function isPeriodLogged(
+  goalId: string,
+  periodDays: number,
+): Promise<boolean> {
+  const since = dayKey(addDays(today(), -(Math.max(1, periodDays) - 1)));
+  const count = await db.meritLog.count({
+    where: { goalId, date: { gte: since } },
+  });
+  return count > 0;
+}
+
+/** Adds `amount` to a MERIT goal's current value, logged against today. */
+async function addMerit(
+  actor: SessionUser,
+  goal: {
+    id: string;
+    userId: string;
+    status: string;
+    progress: number;
+    targetValue: number;
+    currentValue: number;
+    unit: string;
+    title: string;
+  },
+  amount: number,
+): Promise<void> {
+  if (amount <= 0) return;
+  const day = dayKey(today());
+
+  await db.meritLog.upsert({
+    where: { goalId_date: { goalId: goal.id, date: day } },
+    create: { goalId: goal.id, userId: goal.userId, date: day, amount },
+    update: { amount: { increment: amount } },
+  });
+
+  const status = asGoalStatus(goal.status);
+  const newCurrent = goal.currentValue + amount;
+  const progressFrom = goal.progress;
+  const progressTo =
+    status === "COMPLETED"
+      ? 100
+      : measurePct(goal.targetValue, newCurrent, progressFrom);
+
+  await db.goal.update({
+    where: { id: goal.id },
+    data: { currentValue: newCurrent, progress: progressTo },
+  });
+
+  await db.goalUpdate.create({
+    data: {
+      goalId: goal.id,
+      authorId: actor.id,
+      progressFrom,
+      progressTo,
+      statusFrom: status,
+      statusTo: status,
+    },
+  });
+
+  await logActivity({
+    userId: goal.userId,
+    actorId: actor.id,
+    type: "GOAL_UPDATED",
+    entityType: "goal",
+    entityId: goal.id,
+    summary: `Logged ${amount}${goal.unit ? ` ${goal.unit}` : ""} toward "${goal.title}"`,
+    metadata: { amount, progressFrom, progressTo, source: "merit" },
+  });
+}
+
+/**
+ * Logs the current period's target for a periodic MERIT goal — the check the
+ * mentee taps in Core Tasks. Idempotent within a period: if it is already logged
+ * this period, nothing happens.
+ */
+export async function logMeritTarget(
+  actor: SessionUser,
+  goalId: string,
+): Promise<void> {
+  const goal = await loadGoalOrThrow(goalId);
+  await assertCanEditMentee(actor, goal.userId);
+
+  if (asGoalType(goal.goalType) !== "MERIT") {
+    throw new ForbiddenError("Only a merit goal has a period target to log.");
+  }
+  const period = asTargetPeriod(goal.targetPeriod);
+  if (period === "NONE") {
+    throw new ForbiddenError("This goal has no recurring target.");
+  }
+  if (await isPeriodLogged(goalId, PERIOD_DAYS[period])) return;
+
+  const amount = perPeriodTarget(
+    goal.targetValue,
+    goal.currentValue,
+    daysUntil(goal.targetDate),
+    PERIOD_DAYS[period],
+  );
+  await addMerit(actor, goal, amount);
+}
+
+/** Goes the extra mile: logs a custom amount on top of the period target. */
+export async function goExtraMile(
+  actor: SessionUser,
+  goalId: string,
+  amount: number,
+): Promise<void> {
+  const goal = await loadGoalOrThrow(goalId);
+  await assertCanEditMentee(actor, goal.userId);
+
+  if (asGoalType(goal.goalType) !== "MERIT") {
+    throw new ForbiddenError("Only a merit goal can log extra progress.");
+  }
+  await addMerit(actor, goal, Math.max(0, amount));
+}
+
+export type MeritTargetItem = {
+  goalId: string;
+  title: string;
+  categoryKey: GoalCategoryKey;
+  direction: GoalDirection;
+  unit: string;
+  targetPeriod: TargetPeriod;
+  /** How much to log this period. */
+  periodTarget: number;
+  currentValue: number;
+  targetValue: number;
+  /** Already logged in the current period. */
+  done: boolean;
+};
+
+/**
+ * A user's open MERIT period-targets — the goal-derived tasks that show up on the
+ * Core Tasks board. Excludes goals already at their target, and marks whether the
+ * current period has been logged.
+ */
+export async function listMeritTargets(
+  actor: SessionUser,
+  userId: string,
+): Promise<MeritTargetItem[]> {
+  await assertCanViewUser(actor, userId);
+
+  const windowStart = dayKey(addDays(today(), -6)); // widest period is weekly
+  const goals = await db.goal.findMany({
+    where: {
+      userId,
+      goalType: "MERIT",
+      targetPeriod: { not: "NONE" },
+      status: { notIn: ["COMPLETED", "ABANDONED"] },
+    },
+    include: {
+      category: { select: { key: true } },
+      meritLogs: {
+        where: { date: { gte: windowStart } },
+        select: { date: true },
+      },
+    },
+    orderBy: [{ targetDate: "asc" }],
+  });
+
+  const items: MeritTargetItem[] = [];
+  for (const g of goals) {
+    // A goal already at (or past) its target needs no more logging.
+    if (g.targetValue > 0 && g.currentValue >= g.targetValue) continue;
+
+    const period = asTargetPeriod(g.targetPeriod);
+    const periodDays = PERIOD_DAYS[period];
+    const since = dayKey(addDays(today(), -(Math.max(1, periodDays) - 1)));
+    const done = g.meritLogs.some((l) => l.date >= since);
+
+    items.push({
+      goalId: g.id,
+      title: g.title,
+      categoryKey: asGoalCategoryKey(g.category.key),
+      direction: asDirection(g.direction),
+      unit: g.unit,
+      targetPeriod: period,
+      periodTarget: perPeriodTarget(
+        g.targetValue,
+        g.currentValue,
+        daysUntil(g.targetDate),
+        periodDays,
+      ),
+      currentValue: g.currentValue,
+      targetValue: g.targetValue,
+      done,
+    });
+  }
+  return items;
 }
 
 /**

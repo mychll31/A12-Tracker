@@ -76,6 +76,7 @@ model User {
   memberships      GroupMembership[]
   goals            Goal[]
   goalUpdates      GoalUpdate[]
+  meritLogs        MeritLog[]
   taskCompletions  CoreTaskCompletion[]
   checkIns         DailyCheckIn[]
   receivedNotes    CoachingNote[]       @relation("NoteSubject")
@@ -220,6 +221,12 @@ model Goal {
   targetValue  Float    @default(0)
   currentValue Float    @default(0)
   unit         String   @default("")
+  /// MERIT = numeric measure chipped away over time (see MeritLog + targetPeriod);
+  /// MILESTONE = scored by its action plans (GoalTask) instead of a measure.
+  goalType     String   @default("MERIT") // MERIT | MILESTONE
+  /// For a MERIT goal, how often its per-period target recurs. NONE means the
+  /// current value is edited by hand. NONE | DAILY | EVERY_2..EVERY_6 | WEEKLY.
+  targetPeriod String   @default("NONE")
   startDate   DateTime  @default(now())
   targetDate  DateTime
   completedAt DateTime?
@@ -233,6 +240,7 @@ model Goal {
   updates     GoalUpdate[]
   comments    GoalComment[]
   attachments Attachment[]
+  meritLogs   MeritLog[]
 
   @@index([userId, status])
   @@index([categoryId])
@@ -259,6 +267,27 @@ model GoalTask {
 
   @@index([goalId])
   @@map("goal_tasks")
+}
+
+/// A single period's contribution to a MERIT goal's current value. Checking the
+/// goal's target task in Core Tasks writes one of these; the goal's currentValue
+/// is the starting value plus the sum of its logs. One log per goal per day.
+model MeritLog {
+  id        String   @id @default(cuid())
+  goalId    String
+  userId    String
+  // Day bucket, normalised to UTC midnight — the day the merit was logged.
+  date      DateTime
+  // How much was added: the period target, or more for a "go the extra mile" log.
+  amount    Float
+  createdAt DateTime @default(now())
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, date])
+  @@index([userId, date])
+  @@map("merit_logs")
 }
 
 // Append-only progress ledger — powers goal trend analytics.

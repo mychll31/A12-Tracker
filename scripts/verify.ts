@@ -92,41 +92,56 @@ async function main() {
     `${mentees.length} mentees`,
   );
 
-  // --- every goal is scored by a numeric measure (current vs. target) -------
-  const goalsWithoutMeasure = await db.goal.count({
+  // --- merit goals score by a measure; milestone goals score by their plans --
+  const meritsWithoutMeasure = await db.goal.count({
     where: {
+      goalType: "MERIT",
       status: { notIn: ["COMPLETED", "ABANDONED"] },
       targetValue: { lte: 0 },
     },
   });
   check(
-    "every scoreable goal has a measure target",
-    goalsWithoutMeasure === 0,
-    `${await db.goalTask.count()} action plans across ${await db.goal.count()} goals`,
+    "every scoreable merit goal has a measure target",
+    meritsWithoutMeasure === 0,
+    `${await db.goal.count({ where: { goalType: "MERIT" } })} merit · ` +
+      `${await db.goal.count({ where: { goalType: "MILESTONE" } })} milestone goals`,
   );
 
   const allGoals = await db.goal.findMany({
-    include: { category: { select: { key: true } } },
+    include: {
+      category: { select: { key: true } },
+      tasks: { select: { status: true } },
+    },
   });
 
   const clampPct = (n: number) => Math.min(100, Math.max(0, n));
+  const planWeight = (s: string) =>
+    s === "DONE" ? 100 : s === "IN_PROGRESS" ? 50 : 0;
   const misscored = allGoals.filter((g) => {
     if (g.status === "ABANDONED") return false;
-    // A goal is scored by its measure — current ÷ target as a percentage —
-    // with COMPLETED a flat 100 and a target-less goal falling back to its
-    // stored progress. The `progress` column must mirror that score exactly.
+    // MERIT scores by current ÷ target; MILESTONE by the mean of its plan
+    // weights; COMPLETED is a flat 100 — and the progress column mirrors it.
     const expected =
       g.status === "COMPLETED"
         ? 100
-        : g.targetValue > 0
-          ? Math.round(clampPct((g.currentValue / g.targetValue) * 100))
-          : clampPct(g.progress);
+        : g.goalType === "MILESTONE"
+          ? g.tasks.length
+            ? Math.round(
+                g.tasks.reduce((s, t) => s + planWeight(t.status), 0) /
+                  g.tasks.length,
+              )
+            : clampPct(g.progress)
+          : g.targetValue > 0
+            ? Math.round(clampPct((g.currentValue / g.targetValue) * 100))
+            : clampPct(g.progress);
     const actual = scoreGoal({
       status: g.status,
       progress: g.progress,
       categoryKey: g.category.key,
+      goalType: g.goalType,
       targetValue: g.targetValue,
       currentValue: g.currentValue,
+      tasks: g.tasks,
     });
     if (actual === null) return true;
     return (
@@ -135,7 +150,7 @@ async function main() {
     );
   });
   check(
-    "each goal's score is its measure (current ÷ target), mirrored by progress",
+    "each goal's score is its measure or its plans, mirrored by progress",
     misscored.length === 0,
     `${allGoals.length} goals checked`,
   );
@@ -148,8 +163,10 @@ async function main() {
         status: g.status,
         progress: g.progress,
         categoryKey: g.category.key,
+        goalType: g.goalType,
         targetValue: g.targetValue,
         currentValue: g.currentValue,
+        tasks: g.tasks,
       }));
     const cats = scoreCategories(goals);
     const total = weightGoalScore(cats);

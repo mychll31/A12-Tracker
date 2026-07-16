@@ -4,15 +4,22 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { AlertCircle, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { FormField, Input, Textarea } from "@/components/ui/input";
+import { FormField, Input, Label, Textarea } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import {
   GOAL_DIRECTIONS,
   GOAL_STATUSES,
   GOAL_STATUS_LABELS,
+  GOAL_TYPES,
+  GOAL_TYPE_LABELS,
+  TARGET_PERIODS,
+  TARGET_PERIOD_LABELS,
   type GoalDirection,
   type GoalStatus,
+  type GoalType,
+  type TargetPeriod,
 } from "@/lib/domain";
 
 import { deleteGoalAction, setGoalStatusAction, updateGoalAction } from "../actions";
@@ -29,6 +36,11 @@ const DIRECTION_OPTIONS = GOAL_DIRECTIONS.map((key) => ({
   label: key === "LOSE" ? "Lose" : "Gain",
 }));
 
+const PERIOD_OPTIONS = TARGET_PERIODS.map((key) => ({
+  value: key,
+  label: TARGET_PERIOD_LABELS[key],
+}));
+
 export type GoalControlsGoal = {
   id: string;
   title: string;
@@ -37,6 +49,8 @@ export type GoalControlsGoal = {
   status: GoalStatus;
   /** `YYYY-MM-DD` — what `<input type="date">` reads and writes. */
   targetDate: string;
+  goalType: GoalType;
+  targetPeriod: TargetPeriod;
   direction: GoalDirection;
   targetValue: number;
   currentValue: number;
@@ -72,6 +86,7 @@ function ErrorNote({ message }: { message: string }) {
 export function GoalControls({ goal }: { goal: GoalControlsGoal }) {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [goalType, setGoalType] = useState<GoalType>(goal.goalType);
 
   const statusForm = useRef<HTMLFormElement>(null);
   const [statusState, statusAction, statusPending] = useActionState(
@@ -88,6 +103,8 @@ export function GoalControls({ goal }: { goal: GoalControlsGoal }) {
   );
 
   useCloseOnSuccess(editState, editPending, () => setEditing(false));
+
+  const isMerit = goalType === "MERIT";
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -133,11 +150,35 @@ export function GoalControls({ goal }: { goal: GoalControlsGoal }) {
         open={editing}
         onClose={() => setEditing(false)}
         title="Edit goal"
-        description="Edit the goal, its measure and target date. The score is the current value against the target."
+        description="A merit goal is scored by its measure; a milestone goal by its action plans."
         size="lg"
       >
         <form action={editAction} className="flex flex-col gap-5">
           <input type="hidden" name="goalId" value={goal.id} />
+          <input type="hidden" name="goalType" value={goalType} />
+
+          <div className="flex flex-col gap-2">
+            <Label>Goal type</Label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {GOAL_TYPES.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setGoalType(type)}
+                  aria-pressed={goalType === type}
+                  className={cn(
+                    "rounded-xl border px-3.5 py-2 text-sm font-semibold transition-colors",
+                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                    goalType === type
+                      ? "border-primary bg-primary-soft"
+                      : "border-border hover:border-border-strong",
+                  )}
+                >
+                  {GOAL_TYPE_LABELS[type]}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <FormField label="Title" required>
             <Input
@@ -156,42 +197,59 @@ export function GoalControls({ goal }: { goal: GoalControlsGoal }) {
             />
           </FormField>
 
-          <div className="grid gap-5 sm:grid-cols-2">
-            <FormField label="Direction" required>
-              <Select
-                name="direction"
-                options={DIRECTION_OPTIONS}
-                defaultValue={goal.direction}
-              />
-            </FormField>
-            <FormField label="Unit" hint="e.g. Kg, M, books">
-              <Input
-                name="unit"
-                defaultValue={goal.unit}
-                maxLength={20}
-                placeholder="Kg"
-              />
-            </FormField>
-            <FormField label="Target value" required>
-              <Input
-                name="targetValue"
-                type="number"
-                min={0}
-                step="any"
-                defaultValue={goal.targetValue}
-                required
-              />
-            </FormField>
-            <FormField label="Current value">
-              <Input
-                name="currentValue"
-                type="number"
-                min={0}
-                step="any"
-                defaultValue={goal.currentValue}
-              />
-            </FormField>
-          </div>
+          {isMerit ? (
+            <>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <FormField label="Direction" required>
+                  <Select
+                    name="direction"
+                    options={DIRECTION_OPTIONS}
+                    defaultValue={goal.direction}
+                  />
+                </FormField>
+                <FormField label="Unit" hint="e.g. Kg, M, books">
+                  <Input
+                    name="unit"
+                    defaultValue={goal.unit}
+                    maxLength={20}
+                    placeholder="Kg"
+                  />
+                </FormField>
+                <FormField label="Target value" required>
+                  <Input
+                    name="targetValue"
+                    type="number"
+                    min={0}
+                    step="any"
+                    defaultValue={goal.targetValue}
+                    required
+                  />
+                </FormField>
+                <FormField label="Current value">
+                  <Input
+                    name="currentValue"
+                    type="number"
+                    min={0}
+                    step="any"
+                    defaultValue={goal.currentValue}
+                  />
+                </FormField>
+              </div>
+
+              <FormField
+                label="Target period"
+                hint="Splits the target into a recurring task on your Core Tasks."
+              >
+                <Select
+                  name="targetPeriod"
+                  options={PERIOD_OPTIONS}
+                  defaultValue={goal.targetPeriod}
+                />
+              </FormField>
+            </>
+          ) : (
+            <input type="hidden" name="targetPeriod" value="NONE" />
+          )}
 
           <div className="grid gap-5 sm:grid-cols-2">
             <FormField label="Status" required>

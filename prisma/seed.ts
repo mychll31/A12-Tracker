@@ -1230,25 +1230,74 @@ async function main(): Promise<void> {
     const planned = planGoals(person);
     goalsByPerson.set(person.slug, planned);
 
-    for (const goal of planned) {
-      // Place `current` so that current ÷ target matches the planned progress,
-      // then set the stored `progress` column to exactly what `scoreGoal` will
-      // compute from it — the column is a pure mirror of the measure. Whole-unit
-      // targets (books, clients) get a whole `current`; fractional ones (km, %)
-      // keep a decimal.
-      const targetValue = goal.targetValue;
+    for (const [goalIndex, goal] of planned.entries()) {
+      // Two kinds in the demo: most goals are MERIT (a numeric measure), and
+      // every third is a MILESTONE (scored by its action plans instead). Merit
+      // goals cycle through target periods so the Core Tasks board shows a mix.
+      const merit = goalIndex % 3 !== 1;
+      const goalType = merit ? "MERIT" : "MILESTONE";
+      const MERIT_PERIODS = ["DAILY", "EVERY_2", "WEEKLY", "EVERY_3"];
+      const targetPeriod = merit
+        ? (MERIT_PERIODS[goalIndex % MERIT_PERIODS.length] ?? "DAILY")
+        : "NONE";
+
+      // The planned 0-100 the template chose — drives how many action plans read
+      // as done, for either kind.
+      const plannedPct = goal.progress;
+
+      // MERIT measure: place `current` so current ÷ target matches plannedPct.
+      // MILESTONE has no measure.
+      const targetValue = merit ? goal.targetValue : 0;
       const whole = Number.isInteger(targetValue) && targetValue <= 100;
-      const raw = (targetValue * goal.progress) / 100;
-      const currentValue =
-        goal.status === "COMPLETED"
+      const raw = (targetValue * plannedPct) / 100;
+      const currentValue = !merit
+        ? 0
+        : goal.status === "COMPLETED"
           ? targetValue
           : whole
             ? Math.round(raw)
             : Math.round(raw * 10) / 10;
-      goal.progress =
+
+      const count = int(rng, 3, 5);
+      const offset = int(rng, 0, GOAL_TASK_TITLES.length - 1);
+      const spanDays = Math.max(
+        7,
+        Math.round(
+          (goal.targetDate.getTime() - goal.startDate.getTime()) / 86_400_000,
+        ),
+      );
+      // Plans below plannedPct read as done, the one straddling it as in
+      // progress, the rest as not started.
+      const planStatuses = Array.from({ length: count }, (_, i) =>
+        plannedPct >= ((i + 1) / count) * 100
+          ? "DONE"
+          : plannedPct >= (i / count) * 100
+            ? "IN_PROGRESS"
+            : "NOT_STARTED",
+      );
+      const weightOf = (s: string) =>
+        s === "DONE" ? 100 : s === "IN_PROGRESS" ? 50 : 0;
+
+      // Progress mirrors the score: measure for MERIT, plan completion for
+      // MILESTONE, 100 when the goal is complete.
+      const measurePctVal =
         targetValue > 0
           ? clampInt(Math.round((currentValue / targetValue) * 100), 0, 100)
-          : goal.progress;
+          : 0;
+      const milestonePct = clampInt(
+        Math.round(
+          planStatuses.reduce((sum, s) => sum + weightOf(s), 0) /
+            planStatuses.length,
+        ),
+        0,
+        100,
+      );
+      goal.progress =
+        goal.status === "COMPLETED"
+          ? 100
+          : merit
+            ? measurePctVal
+            : milestonePct;
 
       await db.goal.upsert({
         where: { id: goal.id },
@@ -1263,10 +1312,12 @@ async function main(): Promise<void> {
           description: goal.description,
           status: goal.status,
           progress: goal.progress,
-          direction: goal.direction,
+          goalType,
+          targetPeriod,
+          direction: merit ? goal.direction : "GAIN",
           targetValue,
           currentValue,
-          unit: goal.unit,
+          unit: merit ? goal.unit : "",
           startDate: goal.startDate,
           targetDate: goal.targetDate,
           completedAt: goal.completedAt,
@@ -1274,64 +1325,45 @@ async function main(): Promise<void> {
         update: {
           status: goal.status,
           progress: goal.progress,
-          direction: goal.direction,
+          goalType,
+          targetPeriod,
+          direction: merit ? goal.direction : "GAIN",
           targetValue,
           currentValue,
-          unit: goal.unit,
+          unit: merit ? goal.unit : "",
           targetDate: goal.targetDate,
           completedAt: goal.completedAt,
         },
       });
 
       // --- action plans ---
-      // Every goal carries a short action-plan list. These are informational
-      // only — the score comes from the measure above, never from the plans —
-      // so they never write back to the goal's progress. A demo mix of statuses
-      // makes the tracker show all three states out of the box.
-      {
-        const count = int(rng, 3, 5);
-        const offset = int(rng, 0, GOAL_TASK_TITLES.length - 1);
-        const spanDays = Math.max(
-          7,
-          Math.round(
-            (goal.targetDate.getTime() - goal.startDate.getTime()) / 86_400_000,
-          ),
+      // Informational for a MERIT goal; the scorer for a MILESTONE goal.
+      for (let i = 0; i < count; i += 1) {
+        const status = planStatuses[i] ?? "NOT_STARTED";
+        const isComplete = status === "DONE";
+        const dueDate = dayKey(
+          addDays(goal.startDate, Math.round(((i + 1) / count) * spanDays)),
         );
-
-        for (let i = 0; i < count; i += 1) {
-          // Plans below the goal's progress read as done, the one straddling it
-          // as in-progress, and the rest as not started.
-          const status =
-            goal.progress >= ((i + 1) / count) * 100
-              ? "DONE"
-              : goal.progress >= (i / count) * 100
-                ? "IN_PROGRESS"
-                : "NOT_STARTED";
-          const isComplete = status === "DONE";
-          const dueDate = dayKey(
-            addDays(goal.startDate, Math.round(((i + 1) / count) * spanDays)),
-          );
-          const id = `gt_${goal.id}_${i}`;
-          await db.goalTask.upsert({
-            where: { id },
-            create: {
-              id,
-              goalId: goal.id,
-              title:
-                GOAL_TASK_TITLES[(offset + i) % GOAL_TASK_TITLES.length] ?? "",
-              status,
-              isComplete,
-              dueDate,
-              completedAt: isComplete ? atHour(dueDate, 18) : null,
-              sortOrder: i,
-            },
-            update: {
-              status,
-              isComplete,
-              completedAt: isComplete ? atHour(dueDate, 18) : null,
-            },
-          });
-        }
+        const id = `gt_${goal.id}_${i}`;
+        await db.goalTask.upsert({
+          where: { id },
+          create: {
+            id,
+            goalId: goal.id,
+            title:
+              GOAL_TASK_TITLES[(offset + i) % GOAL_TASK_TITLES.length] ?? "",
+            status,
+            isComplete,
+            dueDate,
+            completedAt: isComplete ? atHour(dueDate, 18) : null,
+            sortOrder: i,
+          },
+          update: {
+            status,
+            isComplete,
+            completedAt: isComplete ? atHour(dueDate, 18) : null,
+          },
+        });
       }
 
       // --- progress ledger ---

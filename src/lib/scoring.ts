@@ -7,11 +7,14 @@ import {
   CONSISTENCY_WEIGHTS,
   GOAL_CATEGORY_KEYS,
   GOAL_CATEGORY_WEIGHTS,
+  PLAN_STATUS_WEIGHT,
   SCORE_WEIGHTS,
   SCORING_WINDOW_DAYS,
   STREAK_TARGET_DAYS,
+  asActionPlanStatus,
   asGoalCategoryKey,
   asGoalStatus,
+  asGoalType,
   type GoalCategoryKey,
 } from "@/lib/domain";
 import { addDays, dayKey, isoDay, scoringWindow } from "@/lib/dates";
@@ -76,9 +79,13 @@ export type ScorableGoal = {
   status: string;
   progress: number;
   categoryKey: string;
-  /** The measurable target and how far toward it the owner has come. */
+  /** MERIT scores by the measure below; MILESTONE scores by its action plans. */
+  goalType: string;
+  /** The measurable target and how far toward it the owner has come (MERIT). */
   targetValue: number;
   currentValue: number;
+  /** Action-plan statuses — the scorer for a MILESTONE goal. */
+  tasks: { status: string }[];
 };
 
 /**
@@ -100,10 +107,21 @@ export function scoreGoal(goal: ScorableGoal): number | null {
   if (status === "ABANDONED") return null;
   if (status === "COMPLETED") return 100;
 
+  // A MILESTONE goal is exactly as done as its action plans: the average of
+  // their status weights. With no plans yet it falls back to stored progress.
+  if (asGoalType(goal.goalType) === "MILESTONE") {
+    if (goal.tasks.length === 0) return clamp(goal.progress);
+    const sum = goal.tasks.reduce(
+      (acc, t) => acc + PLAN_STATUS_WEIGHT[asActionPlanStatus(t.status)],
+      0,
+    );
+    return round(sum / goal.tasks.length);
+  }
+
+  // A MERIT goal is its numeric measure: how far current has come toward target.
   if (goal.targetValue > 0) {
     return round(clamp((goal.currentValue / goal.targetValue) * 100));
   }
-
   return clamp(goal.progress);
 }
 
@@ -222,11 +240,12 @@ export async function computeScoresForUsers(
         userId: true,
         status: true,
         progress: true,
+        goalType: true,
         category: { select: { key: true } },
-        // A goal's score is its numeric measure — how far current has come
-        // toward target.
+        // MERIT: the numeric measure. MILESTONE: the action-plan statuses below.
         targetValue: true,
         currentValue: true,
+        tasks: { select: { status: true } },
       },
     }),
     db.coreTaskCompletion.findMany({
@@ -265,8 +284,10 @@ export async function computeScoresForUsers(
       status: g.status,
       progress: g.progress,
       categoryKey: g.category.key,
+      goalType: g.goalType,
       targetValue: g.targetValue,
       currentValue: g.currentValue,
+      tasks: g.tasks,
     });
     goalsBy.set(g.userId, list);
   }

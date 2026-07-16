@@ -21,9 +21,11 @@ import {
   taskBreakdown,
   taskHistory,
 } from "@/server/core-tasks";
+import { listMeritTargets } from "@/server/goals";
 
 import { TodayTasks } from "../dashboard/today-tasks";
 import { DateNav } from "./date-nav";
+import { MeritTargets } from "./merit-targets";
 
 export const metadata: Metadata = { title: "Core Tasks" };
 
@@ -52,11 +54,12 @@ export default async function CoreTasksPage({
   const selectedDate = new Date(`${selectedIso}T00:00:00.000Z`);
   const isToday = selectedIso === todayIso;
 
-  const [board, history, breakdown, missed] = await Promise.all([
+  const [board, history, breakdown, missed, meritTargets] = await Promise.all([
     getTaskBoard(user, user.id, selectedDate),
     taskHistory(user, user.id, HISTORY_DAYS),
     taskBreakdown(user, user.id, CHART_DAYS),
     missedDays(user, user.id, CHART_DAYS),
+    listMeritTargets(user, user.id),
   ]);
 
   const recent = history.slice(-CHART_DAYS);
@@ -161,6 +164,21 @@ export default async function CoreTasksPage({
           )}
         </CardContent>
       </Card>
+
+      {isToday && meritTargets.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle as="h2">Goal targets</CardTitle>
+            <CardDescription>
+              Your merit goals, broken into per-period targets. Check one to log
+              it toward the goal — or go the extra mile to get ahead.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MeritTargets items={meritTargets} />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
