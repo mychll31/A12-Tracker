@@ -21,6 +21,7 @@ import { goalSummaryFor, listGoals } from "@/server/goals";
 
 import { GOAL_CATEGORY_LABELS } from "./categories";
 import { GoalScoreBadge } from "./goal-score-badge";
+import { GoalRankMedal } from "./goal-rank-medal";
 import { NewGoalDialog } from "./new-goal-dialog";
 
 export const metadata: Metadata = { title: "My Goals" };
@@ -287,6 +288,7 @@ export default async function GoalsPage({
                     </Badge>
                     <StatusBadge size="sm" status={goal.status} />
                     <GoalScoreBadge score={goal.score} className="ml-auto" />
+                    <GoalRankMedal score={goal.score} size="sm" />
                   </div>
 
                   <h2 className="line-clamp-2 text-sm font-semibold leading-snug">

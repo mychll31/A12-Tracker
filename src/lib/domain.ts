@@ -215,6 +215,51 @@ export const ACHIEVEMENT_TIERS = [
 ] as const;
 export type AchievementTier = (typeof ACHIEVEMENT_TIERS)[number];
 
+// ---------------------------------------------------------------------------
+// Goal rank medals — a goal's completion percentage (0-100) maps to one of ten
+// ascending ranks, one per 10-point band: 0-10% is Herald, 90-100% is Titan.
+// The rank is pure display flavour on top of the score; it never feeds scoring.
+// ---------------------------------------------------------------------------
+
+export const GOAL_RANKS = [
+  { key: "HERALD", name: "Herald" },
+  { key: "GUARDIAN", name: "Guardian" },
+  { key: "CRUSADER", name: "Crusader" },
+  { key: "ARCHON", name: "Archon" },
+  { key: "LEGEND", name: "Legend" },
+  { key: "ANCIENT", name: "Ancient" },
+  { key: "DIVINE", name: "Divine" },
+  { key: "IMMORTAL", name: "Immortal" },
+  { key: "MASTER_IMMORTAL", name: "Master Immortal" },
+  { key: "TITAN", name: "Titan" },
+] as const;
+
+export type GoalRankKey = (typeof GOAL_RANKS)[number]["key"];
+export type GoalRank = {
+  key: GoalRankKey;
+  name: string;
+  /** Band bounds as whole percents — e.g. Divine is 60–70. */
+  min: number;
+  max: number;
+};
+
+/**
+ * The rank medal for a goal's completion percentage (0-100). Each 10-point band
+ * is one rank; the input is clamped, and a full 100% lands in the top band
+ * (Titan) rather than falling off the end.
+ */
+export function rankForPercent(percent: number): GoalRank {
+  const clamped = Math.min(100, Math.max(0, percent));
+  const index = Math.min(GOAL_RANKS.length - 1, Math.floor(clamped / 10));
+  const def = GOAL_RANKS[index]!;
+  return {
+    key: def.key,
+    name: def.name,
+    min: index * 10,
+    max: index === GOAL_RANKS.length - 1 ? 100 : index * 10 + 10,
+  };
+}
+
 export const MOOD_LABELS: Record<number, string> = {
   1: "Struggling",
   2: "Low",

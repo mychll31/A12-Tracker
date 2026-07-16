@@ -31,6 +31,7 @@ import { getGoal, type GoalDetail } from "@/server/goals";
 
 import { GOAL_CATEGORY_LABELS } from "../categories";
 import { GoalScoreBadge } from "../goal-score-badge";
+import { GoalRankMedal } from "../goal-rank-medal";
 import { CommentForm } from "./comment-form";
 import { GoalControls } from "./goal-controls";
 import { MeasureControl } from "./measure-control";
@@ -102,6 +103,7 @@ export default async function GoalDetailPage({
             </Badge>
             <StatusBadge status={goal.status} />
             <GoalScoreBadge score={goal.score} size="md" />
+            <GoalRankMedal score={goal.score} size="md" />
             {goal.targetValue > 0 ? (
               <Badge variant="neutral">
                 {goal.direction === "LOSE" ? "Lose" : "Gain"} {goal.targetValue}

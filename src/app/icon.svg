@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Abundance 12">
+  <defs>
+    <radialGradient id="orb" cx="50%" cy="42%" r="62%">
+      <stop offset="0%" stop-color="#7fe0ff" />
+      <stop offset="55%" stop-color="#2a6fbf" />
+      <stop offset="100%" stop-color="#0b1a33" />
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.6" result="b" />
+      <feMerge>
+        <feMergeNode in="b" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- soft cyan halo, matching the wordmark's box-shadow glow -->
+  <circle cx="32" cy="32" r="23" fill="none" stroke="#58c8ff" stroke-opacity="0.45" stroke-width="6" filter="url(#glow)" />
+  <!-- the orb: glowing core fading to deep navy at the rim, cyan ring -->
+  <circle cx="32" cy="32" r="23" fill="url(#orb)" stroke="#58c8ff" stroke-width="3" />
+</svg>
