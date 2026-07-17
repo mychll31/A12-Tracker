@@ -993,12 +993,28 @@ function planGoals(person: SeedPerson): PlannedGoal[] {
 // Bulk insert — "only what is missing" is what keeps a re-run cheap and safe
 // ---------------------------------------------------------------------------
 
-async function insertMissing<T extends { id: string }>(
+// `keyOf` must return the key the DATABASE treats as unique, which is often not
+// the row id: seed ids are synthetic (`urole_jonah_MENTEE`), while the constraint
+// is `@@unique([userId, roleId])`. A database that has been seeded by an older
+// build or touched by hand can hold the same logical row under a different id —
+// dedupe on id there and the INSERT trips the real unique index. createMany() is
+// one statement, so that single conflict aborts the whole seed part-way through
+// and leaves a half-populated database. SQLite has no `skipDuplicates`, so the
+// dedupe has to happen here.
+async function insertMissing<T>(
   rows: T[],
-  existingIds: Set<string>,
+  existing: Set<string>,
+  keyOf: (row: T) => string,
   createMany: (data: T[]) => Promise<unknown>,
 ): Promise<number> {
-  const fresh = rows.filter((r) => !existingIds.has(r.id));
+  const seen = new Set(existing);
+  const fresh: T[] = [];
+  for (const row of rows) {
+    const key = keyOf(row);
+    if (seen.has(key)) continue; // also collapses duplicates within `rows`
+    seen.add(key);
+    fresh.push(row);
+  }
   for (const batch of chunk(fresh, 250)) {
     await createMany(batch);
   }
@@ -1007,6 +1023,36 @@ async function insertMissing<T extends { id: string }>(
 
 const idsOf = (rows: { id: string }[]): Set<string> =>
   new Set(rows.map((r) => r.id));
+
+const byId = (row: { id: string }) => row.id;
+
+const keysOf = <T>(rows: T[], keyOf: (row: T) => string): Set<string> =>
+  new Set(rows.map(keyOf));
+
+// One key builder per compound @@unique, used for both the existing DB rows and
+// the rows about to be inserted so the two are always compared the same way.
+// Dates are keyed by full ISO timestamp because the constraints cover the whole
+// DateTime, not just the day.
+const userRoleKey = (r: { userId: string; roleId: string }) =>
+  `${r.userId}:${r.roleId}`;
+
+const completionKey = (r: { userId: string; coreTaskId: string; date: Date }) =>
+  `${r.userId}:${r.coreTaskId}:${r.date.toISOString()}`;
+
+const checkInKey = (r: { userId: string; date: Date }) =>
+  `${r.userId}:${r.date.toISOString()}`;
+
+const prefKey = (r: { userId: string; type: string }) => `${r.userId}:${r.type}`;
+
+const userAchievementKey = (r: { userId: string; achievementId: string }) =>
+  `${r.userId}:${r.achievementId}`;
+
+const leaderboardKey = (r: {
+  board: string;
+  scopeId: string;
+  userId: string;
+  capturedAt: Date;
+}) => `${r.board}:${r.scopeId}:${r.userId}:${r.capturedAt.toISOString()}`;
 
 // ---------------------------------------------------------------------------
 // Seed
@@ -1153,7 +1199,11 @@ async function main(): Promise<void> {
   );
   await insertMissing(
     userRoleRows,
-    idsOf(await db.userRole.findMany({ select: { id: true } })),
+    keysOf(
+      await db.userRole.findMany({ select: { userId: true, roleId: true } }),
+      userRoleKey,
+    ),
+    userRoleKey,
     (data) => db.userRole.createMany({ data }),
   );
 
@@ -1473,13 +1523,23 @@ async function main(): Promise<void> {
 
   await insertMissing(
     completionRows,
-    idsOf(await db.coreTaskCompletion.findMany({ select: { id: true } })),
+    keysOf(
+      await db.coreTaskCompletion.findMany({
+        select: { userId: true, coreTaskId: true, date: true },
+      }),
+      completionKey,
+    ),
+    completionKey,
     (data) => db.coreTaskCompletion.createMany({ data }),
   );
 
   await insertMissing(
     checkInRows,
-    idsOf(await db.dailyCheckIn.findMany({ select: { id: true } })),
+    keysOf(
+      await db.dailyCheckIn.findMany({ select: { userId: true, date: true } }),
+      checkInKey,
+    ),
+    checkInKey,
     (data) => db.dailyCheckIn.createMany({ data }),
   );
 
@@ -1519,6 +1579,7 @@ async function main(): Promise<void> {
   await insertMissing(
     [...reviewRows.values()],
     idsOf(await db.checkInReview.findMany({ select: { id: true } })),
+    byId,
     (data) => db.checkInReview.createMany({ data }),
   );
 
@@ -1661,6 +1722,7 @@ async function main(): Promise<void> {
   await insertMissing(
     notificationRows,
     idsOf(await db.notification.findMany({ select: { id: true } })),
+    byId,
     (data) => db.notification.createMany({ data }),
   );
 
@@ -1675,7 +1737,13 @@ async function main(): Promise<void> {
   );
   await insertMissing(
     prefRows,
-    idsOf(await db.notificationPreference.findMany({ select: { id: true } })),
+    keysOf(
+      await db.notificationPreference.findMany({
+        select: { userId: true, type: true },
+      }),
+      prefKey,
+    ),
+    prefKey,
     (data) => db.notificationPreference.createMany({ data }),
   );
 
@@ -1779,6 +1847,7 @@ async function main(): Promise<void> {
   await insertMissing(
     activityRows,
     idsOf(await db.activityLog.findMany({ select: { id: true } })),
+    byId,
     (data) => db.activityLog.createMany({ data }),
   );
 
@@ -1857,7 +1926,13 @@ async function main(): Promise<void> {
 
   await insertMissing(
     userAchievementRows,
-    idsOf(await db.userAchievement.findMany({ select: { id: true } })),
+    keysOf(
+      await db.userAchievement.findMany({
+        select: { userId: true, achievementId: true },
+      }),
+      userAchievementKey,
+    ),
+    userAchievementKey,
     (data) => db.userAchievement.createMany({ data }),
   );
 
@@ -1965,7 +2040,13 @@ async function main(): Promise<void> {
 
   await insertMissing(
     leaderboardRows,
-    idsOf(await db.leaderboardEntry.findMany({ select: { id: true } })),
+    keysOf(
+      await db.leaderboardEntry.findMany({
+        select: { board: true, scopeId: true, userId: true, capturedAt: true },
+      }),
+      leaderboardKey,
+    ),
+    leaderboardKey,
     (data) => db.leaderboardEntry.createMany({ data }),
   );
 

@@ -6,10 +6,11 @@ import { PrismaClient } from "@/generated/prisma/client";
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function createClient() {
-  // The Vercel Turso integration injects TURSO_DATABASE_URL; local development
-  // sets DATABASE_URL to a "file:" URL. Prefer the former so a deploy needs no
-  // extra wiring, and fall back to the latter for the local file.
-  const url = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL;
+  // Local development sets DATABASE_URL to a "file:" URL. Production should set
+  // DATABASE_URL to one stable libSQL/Turso database. The Vercel Turso
+  // integration injects TURSO_DATABASE_URL as a deployment-scoped URL
+  // (`dpl-...turso.io`), so it must stay a fallback, not the primary source.
+  const url = process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL;
   if (!url) {
     throw new Error(
       'No database URL. Locally set DATABASE_URL to a SQLite file ("file:./dev.db"); on Vercel the Turso integration provides TURSO_DATABASE_URL + TURSO_AUTH_TOKEN. Set AUTH_SECRET too. See docs/LOCAL-SETUP.md.',
@@ -28,7 +29,7 @@ function createClient() {
   // token is only needed for the remote case and is simply undefined locally.
   const adapter = new PrismaLibSql({
     url,
-    authToken: process.env.TURSO_AUTH_TOKEN,
+    authToken: process.env.DATABASE_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN,
   });
 
   return new PrismaClient({
