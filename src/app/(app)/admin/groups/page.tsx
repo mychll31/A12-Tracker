@@ -70,6 +70,7 @@ export default async function AdminGroupsPage() {
     name: group.name,
     description: group.description,
     isActive: group.isActive,
+    coachId: group.coach.id,
     coachName: `${group.coach.firstName} ${group.coach.lastName}`,
     memberCount: group.memberCount,
     averageScore: group.averageScore,

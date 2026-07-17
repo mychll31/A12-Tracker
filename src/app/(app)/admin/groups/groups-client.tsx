@@ -51,6 +51,7 @@ export type GroupView = {
   name: string;
   description: string | null;
   isActive: boolean;
+  coachId: string;
   coachName: string;
   memberCount: number;
   averageScore: number;
@@ -381,6 +382,17 @@ export function GroupsClient({
             <FormField label="Name" required>
               <Input name="name" defaultValue={dialog.group.name} required />
             </FormField>
+
+            <div className="mt-4">
+              <FormField label="Coach" required>
+                <Select
+                  name="coachId"
+                  options={coachOptions}
+                  defaultValue={dialog.group.coachId}
+                  required
+                />
+              </FormField>
+            </div>
 
             <div className="mt-4">
               <FormField label="Description">

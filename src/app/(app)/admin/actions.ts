@@ -47,7 +47,17 @@ const fail = (error: string): ActionState => ({
 });
 
 const USER_PATHS = ["/admin", "/admin/users"];
-const GROUP_PATHS = ["/admin", "/admin/groups", "/admin/users"];
+const GROUP_PATHS = [
+  "/admin",
+  "/admin/groups",
+  "/admin/users",
+  "/coach",
+  "/coach/groups",
+  "/coach/mentees",
+  "/dashboard",
+  "/leaderboards",
+  "/organization",
+];
 const CORE_TASK_PATHS = ["/admin", "/admin/core-tasks"];
 const MAINTENANCE_PATHS = ["/admin", "/dashboard", "/leaderboards"];
 
@@ -287,6 +297,7 @@ export async function createGroupAction(
 const updateGroupSchema = z.object({
   groupId: z.string().min(1, "That council no longer exists."),
   name: z.string().min(1, "Give the council a name.").optional(),
+  coachId: z.string().min(1, "Choose a coach to lead the council.").optional(),
   description: z.string().optional(),
   isActive: flag,
 });
@@ -301,6 +312,7 @@ export async function updateGroupAction(
     const { groupId, ...input } = updateGroupSchema.parse({
       groupId: text(formData, "groupId"),
       name: text(formData, "name"),
+      coachId: text(formData, "coachId"),
       description: raw(formData, "description"),
       isActive: raw(formData, "isActive"),
     });

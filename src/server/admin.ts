@@ -45,14 +45,16 @@ async function assertManagesGroup(
   actor: SessionUser,
   groupId: string,
 ): Promise<void> {
-  if (actor.isAdmin) return;
-
   const group = await db.coachGroup.findUnique({
     where: { id: groupId },
-    select: { coachId: true },
+    select: { coachId: true, organizationId: true },
   });
 
-  if (!group || group.coachId !== actor.id) {
+  if (!group || group.organizationId !== actor.organizationId) {
+    throw new ForbiddenError("That council is outside your organization.");
+  }
+
+  if (!actor.isAdmin && group.coachId !== actor.id) {
     throw new ForbiddenError("You do not lead that coaching group.");
   }
 }
@@ -74,6 +76,25 @@ async function roleIdsFor(keys: RoleKey[]): Promise<string[]> {
   }
 
   return rows.map((r) => r.id);
+}
+
+async function assertActiveCoach(
+  actor: SessionUser,
+  coachId: string,
+): Promise<void> {
+  const coach = await db.user.findFirst({
+    where: {
+      id: coachId,
+      organizationId: actor.organizationId,
+      isActive: true,
+      roles: { some: { role: { key: "COACH" } } },
+    },
+    select: { id: true },
+  });
+
+  if (!coach) {
+    throw new ForbiddenError("Choose an active coach in your organization.");
+  }
 }
 
 /**
@@ -313,15 +334,18 @@ export async function createGroup(
   actor: SessionUser,
   input: { name: string; description?: string; coachId: string },
 ): Promise<string> {
+  const coachId = input.coachId.trim();
+
   // A coach may open a group — but only one they will lead themselves.
-  if (!actor.isAdmin && !(actor.isCoach && input.coachId === actor.id)) {
+  if (!actor.isAdmin && !(actor.isCoach && coachId === actor.id)) {
     throw new ForbiddenError("A coach may only create groups they lead.");
   }
+  await assertActiveCoach(actor, coachId);
 
   const group = await db.coachGroup.create({
     data: {
       organizationId: actor.organizationId,
-      coachId: input.coachId,
+      coachId,
       name: input.name.trim(),
       description: input.description?.trim() || null,
     },
@@ -334,13 +358,31 @@ export async function createGroup(
 export async function updateGroup(
   actor: SessionUser,
   groupId: string,
-  input: { name?: string; description?: string; isActive?: boolean },
+  input: {
+    name?: string;
+    description?: string;
+    isActive?: boolean;
+    coachId?: string;
+  },
 ): Promise<void> {
   await assertManagesGroup(actor, groupId);
+
+  if (input.coachId !== undefined && !actor.isAdmin) {
+    throw new ForbiddenError("Only an administrator may change a council coach.");
+  }
+
+  const coachId = input.coachId?.trim();
+  if (input.coachId !== undefined) {
+    if (!coachId) {
+      throw new ForbiddenError("Choose an active coach in your organization.");
+    }
+    await assertActiveCoach(actor, coachId);
+  }
 
   await db.coachGroup.update({
     where: { id: groupId },
     data: {
+      ...(coachId === undefined ? {} : { coachId }),
       ...(input.name === undefined ? {} : { name: input.name.trim() }),
       ...(input.description === undefined
         ? {}
