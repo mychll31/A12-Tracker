@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
 
 import { signUp, type AuthState } from "../../(auth)/actions";
 
@@ -32,6 +33,22 @@ const hintStyle: React.CSSProperties = {
   marginTop: 8,
 };
 
+const passwordToggleStyle: React.CSSProperties = {
+  position: "absolute",
+  right: 6,
+  top: "50%",
+  transform: "translateY(-50%)",
+  width: 34,
+  height: 34,
+  border: "none",
+  borderRadius: 9,
+  background: "transparent",
+  color: "var(--a12-muted)",
+  cursor: "pointer",
+  display: "grid",
+  placeItems: "center",
+};
+
 /**
  * Create account — the front door of the onboarding experience.
  *
@@ -53,6 +70,7 @@ export default function RegisterPage() {
   const [headline, setHeadline] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   return (
     <div
@@ -253,16 +271,31 @@ export default function RegisterPage() {
             <label htmlFor="a12-password" style={labelStyle}>
               Password
             </label>
-            <input
-              id="a12-password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              style={fieldStyle}
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                id="a12-password"
+                name="password"
+                type={passwordVisible ? "text" : "password"}
+                autoComplete="new-password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                style={{ ...fieldStyle, paddingRight: 46 }}
+              />
+              <button
+                type="button"
+                aria-label={passwordVisible ? "Hide password" : "Show password"}
+                aria-pressed={passwordVisible}
+                onClick={() => setPasswordVisible((current) => !current)}
+                style={passwordToggleStyle}
+              >
+                {passwordVisible ? (
+                  <EyeOff size={17} aria-hidden="true" />
+                ) : (
+                  <Eye size={17} aria-hidden="true" />
+                )}
+              </button>
+            </div>
             <p style={hintStyle}>
               At least 10 characters, with an uppercase letter and a number.
             </p>

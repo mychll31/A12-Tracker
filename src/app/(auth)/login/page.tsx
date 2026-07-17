@@ -6,6 +6,7 @@ import { AlertCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { FormField, Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { signIn, type AuthState } from "../actions";
 
 const initialState: AuthState = { error: null };
@@ -39,9 +40,8 @@ export default function LoginPage({
         </FormField>
 
         <FormField label="Password" required>
-          <Input
+          <PasswordInput
             name="password"
-            type="password"
             autoComplete="current-password"
             placeholder="••••••••••"
             required

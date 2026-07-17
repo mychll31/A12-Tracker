@@ -34,6 +34,9 @@ export type {
   TextareaProps,
 } from "./input";
 
+export { PasswordInput } from "./password-input";
+export type { PasswordInputProps } from "./password-input";
+
 export { Select } from "./select";
 export type { SelectOption, SelectProps } from "./select";
 

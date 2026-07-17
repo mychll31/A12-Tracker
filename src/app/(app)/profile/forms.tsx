@@ -3,7 +3,13 @@
 import { useActionState } from "react";
 import { AlertCircle, CircleCheck } from "lucide-react";
 
-import { Button, FormField, Input, Textarea } from "@/components/ui";
+import {
+  Button,
+  FormField,
+  Input,
+  PasswordInput,
+  Textarea,
+} from "@/components/ui";
 
 import { changePassword, updateProfile } from "./actions";
 import { initialProfileState } from "../_lib/form-state";
@@ -122,9 +128,8 @@ export function PasswordForm() {
   return (
     <form action={formAction} className="space-y-5">
       <FormField label="Current password" required>
-        <Input
+        <PasswordInput
           name="currentPassword"
-          type="password"
           autoComplete="current-password"
           required
         />
@@ -135,9 +140,8 @@ export function PasswordForm() {
         hint="At least 10 characters, with an uppercase letter, a lowercase letter and a number."
         required
       >
-        <Input
+        <PasswordInput
           name="newPassword"
-          type="password"
           autoComplete="new-password"
           required
         />
