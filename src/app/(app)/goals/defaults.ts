@@ -1,0 +1,1 @@
+export const DEFAULT_GOAL_TARGET_DATE = "2026-11-26";

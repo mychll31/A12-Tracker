@@ -23,6 +23,7 @@ import {
 import { createGoalAction } from "./actions";
 import { initialGoalState } from "../_lib/form-state";
 import { GOAL_CATEGORY_LABELS } from "./categories";
+import { DEFAULT_GOAL_TARGET_DATE } from "./defaults";
 
 const CATEGORY_OPTIONS = GOAL_CATEGORY_KEYS.map((key) => ({
   value: key,
@@ -156,7 +157,12 @@ export function NewGoalDialog({
             </FormField>
 
             <FormField label="Target date" required>
-              <Input name="targetDate" type="date" required />
+              <Input
+                name="targetDate"
+                type="date"
+                defaultValue={DEFAULT_GOAL_TARGET_DATE}
+                required
+              />
             </FormField>
           </div>
 

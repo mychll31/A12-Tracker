@@ -26,7 +26,7 @@ import {
 } from "@/server/goals";
 
 import type { GoalFormState } from "../_lib/form-state";
-
+import { DEFAULT_GOAL_TARGET_DATE } from "./defaults";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -92,7 +92,7 @@ export async function createGoalAction(
     targetValue: formData.get("targetValue") ?? 0,
     currentValue: formData.get("currentValue") ?? 0,
     unit: formData.get("unit") ?? undefined,
-    targetDate: formData.get("targetDate"),
+    targetDate: formData.get("targetDate") || DEFAULT_GOAL_TARGET_DATE,
     notes: formData.get("notes") ?? undefined,
     plans: formData.getAll("task").map((value) => String(value)),
   });
