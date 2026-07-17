@@ -68,13 +68,20 @@ export async function getOnboardingState(
       select: { id: true, key: true, name: true, description: true },
     }),
     db.coachGroup.findMany({
-      where: { organizationId: actor.organizationId, isActive: true },
+      where: {
+        organizationId: actor.organizationId,
+        isActive: true,
+        coach: { isActive: true },
+      },
       select: {
         id: true,
         name: true,
         description: true,
         coach: { select: { firstName: true, lastName: true } },
-        memberships: { where: { isActive: true }, select: { menteeId: true } },
+        memberships: {
+          where: { isActive: true, mentee: { isActive: true } },
+          select: { menteeId: true },
+        },
       },
     }),
   ]);

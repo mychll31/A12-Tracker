@@ -132,6 +132,7 @@ export async function listUsers(
   const rows = await db.user.findMany({
     where: {
       organizationId: actor.organizationId,
+      isActive: true,
       ...(opts?.role ? { roles: { some: { role: { key: opts.role } } } } : {}),
       ...(search
         ? {
@@ -155,7 +156,10 @@ export async function listUsers(
       lastActiveAt: true,
       roles: { select: { role: { select: { key: true } } } },
       memberships: {
-        where: { isActive: true },
+        where: {
+          isActive: true,
+          group: { isActive: true, coach: { isActive: true } },
+        },
         select: { group: { select: { name: true } } },
       },
     },

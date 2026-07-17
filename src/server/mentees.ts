@@ -120,7 +120,7 @@ async function cardsForUserIds(
 
   const [users, scores] = await Promise.all([
     db.user.findMany({
-      where: { id: { in: userIds } },
+      where: { id: { in: userIds }, isActive: true },
       select: {
         id: true,
         firstName: true,
@@ -130,7 +130,10 @@ async function cardsForUserIds(
         isActive: true,
         lastActiveAt: true,
         memberships: {
-          where: { isActive: true },
+          where: {
+            isActive: true,
+            group: { isActive: true, coach: { isActive: true } },
+          },
           select: {
             group: {
               select: {
@@ -197,11 +200,20 @@ export async function listMentees(
   const rows = await db.user.findMany({
     where: {
       organizationId: actor.organizationId,
+      isActive: true,
       roles: { some: { role: { key: "MENTEE" } } },
       // `null` means no restriction — a coach or admin sees the whole org.
       ...(allowed === null ? {} : { id: { in: allowed } }),
       ...(opts?.groupId
-        ? { memberships: { some: { groupId: opts.groupId, isActive: true } } }
+        ? {
+            memberships: {
+              some: {
+                groupId: opts.groupId,
+                isActive: true,
+                group: { isActive: true, coach: { isActive: true } },
+              },
+            },
+          }
         : {}),
       ...(search
         ? {
@@ -226,8 +238,8 @@ export async function getMenteeProfile(
   await assertCanViewUser(actor, menteeId);
 
   const [user, score, canEdit] = await Promise.all([
-    db.user.findUnique({
-      where: { id: menteeId },
+    db.user.findFirst({
+      where: { id: menteeId, isActive: true },
       select: {
         id: true,
         email: true,
@@ -241,7 +253,10 @@ export async function getMenteeProfile(
         joinedAt: true,
         lastActiveAt: true,
         memberships: {
-          where: { isActive: true },
+          where: {
+            isActive: true,
+            group: { isActive: true, coach: { isActive: true } },
+          },
           select: {
             group: { select: { id: true, name: true, coach: person } },
           },
@@ -288,6 +303,8 @@ export async function listGroups(actor: SessionUser): Promise<GroupSummary[]> {
   const groups = await db.coachGroup.findMany({
     where: {
       organizationId: actor.organizationId,
+      isActive: true,
+      coach: { isActive: true },
       // A mentee sees only the group they are actually in.
       ...(allowed === null
         ? {}
@@ -301,7 +318,7 @@ export async function listGroups(actor: SessionUser): Promise<GroupSummary[]> {
       isActive: true,
       coach: person,
       memberships: {
-        where: { isActive: true },
+        where: { isActive: true, mentee: { isActive: true } },
         select: { menteeId: true },
       },
     },
@@ -336,15 +353,20 @@ export async function getGroup(
 ): Promise<GroupDetail> {
   assertCanViewGroup(actor, groupId);
 
-  const group = await db.coachGroup.findUnique({
-    where: { id: groupId },
+  const group = await db.coachGroup.findFirst({
+    where: {
+      id: groupId,
+      organizationId: actor.organizationId,
+      isActive: true,
+      coach: { isActive: true },
+    },
     select: {
       id: true,
       name: true,
       description: true,
       coach: person,
       memberships: {
-        where: { isActive: true },
+        where: { isActive: true, mentee: { isActive: true } },
         select: { menteeId: true },
       },
     },
@@ -396,14 +418,21 @@ export async function listCouncilsForMember(
   actor: SessionUser,
 ): Promise<CouncilOption[]> {
   const groups = await db.coachGroup.findMany({
-    where: { organizationId: actor.organizationId, isActive: true },
+    where: {
+      organizationId: actor.organizationId,
+      isActive: true,
+      coach: { isActive: true },
+    },
     orderBy: { name: "asc" },
     select: {
       id: true,
       name: true,
       description: true,
       coach: { select: { firstName: true, lastName: true } },
-      memberships: { where: { isActive: true }, select: { menteeId: true } },
+      memberships: {
+        where: { isActive: true, mentee: { isActive: true } },
+        select: { menteeId: true },
+      },
     },
   });
 

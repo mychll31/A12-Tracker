@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { Prisma } from "@/generated/prisma/client";
+
 import { db } from "@/lib/db";
 import type { SessionUser } from "@/lib/auth";
 import { assertCanViewUser, visibleUserIds } from "@/lib/rbac";
@@ -83,15 +85,17 @@ export async function recentActivity(
 ): Promise<ActivityItem[]> {
   const limit = opts?.limit ?? DEFAULT_LIMIT;
 
-  let where: { userId?: string | { in: string[] } } = {};
+  let where: Prisma.ActivityLogWhereInput = { user: { isActive: true } };
 
   if (opts?.userId) {
     await assertCanViewUser(actor, opts.userId);
-    where = { userId: opts.userId };
+    where = { userId: opts.userId, user: { isActive: true } };
   } else {
     const allowed = await visibleUserIds(actor);
     // `null` means no restriction — never read it as "see nobody".
-    if (allowed !== null) where = { userId: { in: allowed } };
+    if (allowed !== null) {
+      where = { userId: { in: allowed }, user: { isActive: true } };
+    }
   }
 
   const person = {

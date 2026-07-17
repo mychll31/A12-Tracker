@@ -247,7 +247,7 @@ export async function listNotesForMentee(
   await assertCanViewUser(actor, menteeId);
 
   const rows = await db.coachingNote.findMany({
-    where: { menteeId },
+    where: { menteeId, mentee: { isActive: true } },
     orderBy: { createdAt: "desc" },
     include: noteInclude,
   });
@@ -264,7 +264,7 @@ export async function listNotesByCoach(
   await assertCanViewUser(actor, coachId);
 
   const rows = await db.coachingNote.findMany({
-    where: { coachId },
+    where: { coachId, mentee: { isActive: true } },
     orderBy: { createdAt: "desc" },
     include: noteInclude,
   });
@@ -299,7 +299,11 @@ export async function upcomingFollowUps(
   const end = addDays(start, withinDays);
 
   const rows = await db.coachingNote.findMany({
-    where: { coachId, followUpDate: { gte: start, lte: end } },
+    where: {
+      coachId,
+      followUpDate: { gte: start, lte: end },
+      mentee: { isActive: true },
+    },
     orderBy: { followUpDate: "asc" },
     include: { mentee: person },
   });

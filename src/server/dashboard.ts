@@ -237,8 +237,13 @@ export async function getMenteeDashboard(actor: SessionUser): Promise<{
   // coach to show and no board to be ranked on.
   const [group, groupRank] = await Promise.all([
     actor.menteeGroupId
-      ? db.coachGroup.findUnique({
-          where: { id: actor.menteeGroupId },
+      ? db.coachGroup.findFirst({
+          where: {
+            id: actor.menteeGroupId,
+            organizationId: actor.organizationId,
+            isActive: true,
+            coach: { isActive: true },
+          },
           select: {
             coach: {
               select: {
@@ -411,11 +416,14 @@ export async function getCoachDashboard(actor: SessionUser): Promise<{
       select: {
         id: true,
         name: true,
-        memberships: { where: { isActive: true }, select: { menteeId: true } },
+        memberships: {
+          where: { isActive: true, mentee: { isActive: true } },
+          select: { menteeId: true },
+        },
       },
     }),
     db.user.findMany({
-      where: { id: { in: menteeIds } },
+      where: { id: { in: menteeIds }, isActive: true },
       select: {
         id: true,
         firstName: true,
@@ -424,7 +432,10 @@ export async function getCoachDashboard(actor: SessionUser): Promise<{
         headline: true,
         lastActiveAt: true,
         memberships: {
-          where: { isActive: true },
+          where: {
+            isActive: true,
+            group: { isActive: true, coach: { isActive: true } },
+          },
           select: { group: { select: { name: true } } },
         },
       },
@@ -439,10 +450,18 @@ export async function getCoachDashboard(actor: SessionUser): Promise<{
       where: { userId: { in: menteeIds }, reviews: { none: {} } },
     }),
     db.coachingNote.count({
-      where: { coachId: actor.id, createdAt: { gte: monthStart() } },
+      where: {
+        coachId: actor.id,
+        createdAt: { gte: monthStart() },
+        mentee: { isActive: true },
+      },
     }),
     db.coachingNote.findMany({
-      where: { coachId: actor.id, followUpDate: { gte: day } },
+      where: {
+        coachId: actor.id,
+        followUpDate: { gte: day },
+        mentee: { isActive: true },
+      },
       orderBy: { followUpDate: "asc" },
       select: {
         id: true,
@@ -453,7 +472,7 @@ export async function getCoachDashboard(actor: SessionUser): Promise<{
       },
     }),
     db.activityLog.findMany({
-      where: { userId: { in: menteeIds } },
+      where: { userId: { in: menteeIds }, user: { isActive: true } },
       orderBy: { createdAt: "desc" },
       take: RECENT_ACTIVITY_LIMIT,
       select: {
@@ -616,12 +635,14 @@ export async function getOrgDashboard(actor: SessionUser): Promise<{
     db.user.count({
       where: {
         organizationId: orgId,
+        isActive: true,
         roles: { some: { role: { key: "COACH" } } },
       },
     }),
     db.user.count({
       where: {
         organizationId: orgId,
+        isActive: true,
         roles: { some: { role: { key: "MENTEE" } } },
       },
     }),
@@ -629,17 +650,24 @@ export async function getOrgDashboard(actor: SessionUser): Promise<{
     getLeaderboard(actor, "ORGANIZATION", orgId),
     orgTrend(actor, orgId, TREND_DAYS),
     db.user.count({
-      where: { organizationId: orgId, joinedAt: { gte: since } },
+      where: {
+        organizationId: orgId,
+        isActive: true,
+        joinedAt: { gte: since },
+      },
     }),
     db.goal.count({
       where: {
-        user: { organizationId: orgId },
+        user: { organizationId: orgId, isActive: true },
         status: "COMPLETED",
         completedAt: { gte: since },
       },
     }),
     db.dailyCheckIn.count({
-      where: { user: { organizationId: orgId }, date: { gte: since } },
+      where: {
+        user: { organizationId: orgId, isActive: true },
+        date: { gte: since },
+      },
     }),
   ]);
 

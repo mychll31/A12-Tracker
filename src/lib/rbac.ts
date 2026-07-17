@@ -34,7 +34,12 @@ export class ForbiddenError extends Error {
 export const groupMemberIds = cache(
   async (groupId: string): Promise<string[]> => {
     const rows = await db.groupMembership.findMany({
-      where: { groupId, isActive: true },
+      where: {
+        groupId,
+        isActive: true,
+        group: { isActive: true, coach: { isActive: true } },
+        mentee: { isActive: true },
+      },
       select: { menteeId: true },
     });
     return rows.map((r) => r.menteeId);
@@ -45,7 +50,11 @@ export const groupMemberIds = cache(
 export const coachMenteeIds = cache(
   async (coachId: string): Promise<string[]> => {
     const rows = await db.groupMembership.findMany({
-      where: { isActive: true, group: { coachId, isActive: true } },
+      where: {
+        isActive: true,
+        group: { coachId, isActive: true },
+        mentee: { isActive: true },
+      },
       select: { menteeId: true },
     });
     return [...new Set(rows.map((r) => r.menteeId))];
@@ -77,7 +86,12 @@ export const delegatedMenteeIds = cache(
     const viaGroups = groupIds.length
       ? await db.groupMembership
           .findMany({
-            where: { groupId: { in: groupIds }, isActive: true },
+            where: {
+              groupId: { in: groupIds },
+              isActive: true,
+              group: { isActive: true, coach: { isActive: true } },
+              mentee: { isActive: true },
+            },
             select: { menteeId: true },
           })
           .then((rows) => rows.map((r) => r.menteeId))
@@ -107,8 +121,12 @@ export async function visibleUserIds(
 
   const [members, group] = await Promise.all([
     groupMemberIds(actor.menteeGroupId),
-    db.coachGroup.findUnique({
-      where: { id: actor.menteeGroupId },
+    db.coachGroup.findFirst({
+      where: {
+        id: actor.menteeGroupId,
+        isActive: true,
+        coach: { isActive: true },
+      },
       select: { coachId: true },
     }),
   ]);

@@ -231,7 +231,7 @@ export async function computeScoresForUsers(
 
   const [users, goals, completions, checkIns] = await Promise.all([
     db.user.findMany({
-      where: { id: { in: userIds } },
+      where: { id: { in: userIds }, isActive: true },
       select: { id: true, joinedAt: true, organizationId: true },
     }),
     db.goal.findMany({
@@ -425,7 +425,11 @@ export async function computeCoachScores(
   if (!coachIds.length) return result;
 
   const memberships = await db.groupMembership.findMany({
-    where: { isActive: true, group: { coachId: { in: coachIds } } },
+    where: {
+      isActive: true,
+      group: { coachId: { in: coachIds }, isActive: true },
+      mentee: { isActive: true },
+    },
     select: {
       menteeId: true,
       group: { select: { coachId: true } },
@@ -465,7 +469,12 @@ export async function computeGroupScore(
   asOf: Date = new Date(),
 ): Promise<{ averageScore: number; memberCount: number }> {
   const memberships = await db.groupMembership.findMany({
-    where: { groupId, isActive: true },
+    where: {
+      groupId,
+      isActive: true,
+      group: { isActive: true },
+      mentee: { isActive: true },
+    },
     select: { menteeId: true },
   });
 
@@ -493,7 +502,7 @@ export async function computeOrgScore(
   asOf: Date = new Date(),
 ): Promise<OrgScore> {
   const users = await db.user.findMany({
-    where: { organizationId },
+    where: { organizationId, isActive: true },
     select: { id: true, isActive: true },
   });
 
@@ -509,7 +518,7 @@ export async function computeOrgScore(
   return {
     averageScore: averageScore(all),
     memberCount: users.length,
-    activeCount: users.filter((u) => u.isActive).length,
+    activeCount: users.length,
     goalCompletionRate: goalsTotal ? round((goalsDone / goalsTotal) * 100) : 0,
     taskCompletionRate: all.length
       ? round(all.reduce((s, u) => s + u.taskCompletionRate, 0) / all.length)
@@ -533,9 +542,12 @@ export async function persistSnapshots(
   const date = dayKey(asOf);
 
   const [users, groups] = await Promise.all([
-    db.user.findMany({ where: { organizationId }, select: { id: true } }),
-    db.coachGroup.findMany({
+    db.user.findMany({
       where: { organizationId, isActive: true },
+      select: { id: true },
+    }),
+    db.coachGroup.findMany({
+      where: { organizationId, isActive: true, coach: { isActive: true } },
       select: { id: true, coachId: true },
     }),
   ]);

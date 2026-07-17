@@ -122,7 +122,13 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     include: {
       roles: { include: { role: true } },
       coachGroups: { where: { isActive: true }, select: { id: true } },
-      memberships: { where: { isActive: true }, select: { groupId: true } },
+      memberships: {
+        where: {
+          isActive: true,
+          group: { isActive: true, coach: { isActive: true } },
+        },
+        select: { groupId: true },
+      },
     },
   });
 

@@ -100,8 +100,8 @@ export async function userTaskTrend(
 > {
   await assertCanViewUser(actor, userId);
 
-  const user = await db.user.findUnique({
-    where: { id: userId },
+  const user = await db.user.findFirst({
+    where: { id: userId, isActive: true },
     select: { organizationId: true },
   });
   if (!user) return [];
@@ -345,6 +345,7 @@ export async function coachComparison(
   const coaches = await db.user.findMany({
     where: {
       organizationId,
+      isActive: true,
       roles: { some: { role: { key: "COACH" } } },
     },
     select: {

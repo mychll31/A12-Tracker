@@ -177,7 +177,19 @@ async function resolveScope(
       throw new ForbiddenError("You are not a member of a coaching group.");
     }
     assertCanViewGroup(actor, groupId);
-    return groupId;
+
+    const group = await db.coachGroup.findFirst({
+      where: {
+        id: groupId,
+        organizationId: actor.organizationId,
+        isActive: true,
+        coach: { isActive: true },
+      },
+      select: { id: true },
+    });
+    if (!group) throw new ForbiddenError("That council is not available.");
+
+    return group.id;
   }
 
   // CORE_TASK | GOAL_COMPLETION | CONSISTENCY — organization-wide for a coach,
@@ -191,12 +203,27 @@ async function resolveScope(
     return own;
   }
 
-  return scopeId ?? actor.organizationId;
+  const resolved = scopeId ?? actor.organizationId;
+  if (resolved === actor.organizationId) return resolved;
+
+  assertCanViewGroup(actor, resolved);
+  const group = await db.coachGroup.findFirst({
+    where: {
+      id: resolved,
+      organizationId: actor.organizationId,
+      isActive: true,
+      coach: { isActive: true },
+    },
+    select: { id: true },
+  });
+  if (!group) throw new ForbiddenError("That council is not available.");
+
+  return group.id;
 }
 
 async function orgUserIds(organizationId: string): Promise<string[]> {
   const rows = await db.user.findMany({
-    where: { organizationId },
+    where: { organizationId, isActive: true },
     select: { id: true },
   });
   return rows.map((r) => r.id);
@@ -212,8 +239,8 @@ async function orgUserIds(organizationId: string): Promise<string[]> {
 async function groupCandidateIds(groupId: string): Promise<string[]> {
   const [members, group] = await Promise.all([
     groupMemberIds(groupId),
-    db.coachGroup.findUnique({
-      where: { id: groupId },
+    db.coachGroup.findFirst({
+      where: { id: groupId, isActive: true, coach: { isActive: true } },
       select: { coachId: true },
     }),
   ]);
@@ -256,8 +283,13 @@ export async function availableBoards(
     // rank them against, so they are offered no board at all.
     if (!actor.menteeGroupId) return [];
 
-    const group = await db.coachGroup.findUnique({
-      where: { id: actor.menteeGroupId },
+    const group = await db.coachGroup.findFirst({
+      where: {
+        id: actor.menteeGroupId,
+        organizationId: actor.organizationId,
+        isActive: true,
+        coach: { isActive: true },
+      },
       select: { id: true, name: true },
     });
     if (!group) return [];
@@ -269,7 +301,11 @@ export async function availableBoards(
   }
 
   const groups = await db.coachGroup.findMany({
-    where: { organizationId: actor.organizationId, isActive: true },
+    where: {
+      organizationId: actor.organizationId,
+      isActive: true,
+      coach: { isActive: true },
+    },
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });
@@ -309,6 +345,7 @@ async function coachBoard(scopeId: string, asOf: Date): Promise<Ranked[]> {
   const coaches = await db.user.findMany({
     where: {
       organizationId: scopeId,
+      isActive: true,
       roles: { some: { role: { key: "COACH" } } },
     },
     select: USER_SELECT,
@@ -341,7 +378,7 @@ async function userBoard(
 
   const [users, scores] = await Promise.all([
     db.user.findMany({
-      where: { id: { in: candidateIds } },
+      where: { id: { in: candidateIds }, isActive: true },
       select: USER_SELECT,
     }),
     computeScoresForUsers(candidateIds, asOf),
@@ -424,7 +461,7 @@ export async function captureLeaderboards(
   const capturedAt = dayKey(asOf);
 
   const groups = await db.coachGroup.findMany({
-    where: { organizationId, isActive: true },
+    where: { organizationId, isActive: true, coach: { isActive: true } },
     select: { id: true },
   });
 
