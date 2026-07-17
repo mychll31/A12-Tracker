@@ -74,11 +74,11 @@ export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
       </div>
 
       <FormField
-        label="Headline"
+        label="Declaration"
         hint="One line that says what you're working towards."
       >
         <Input
-          name="headline"
+          name="Declaration"
           defaultValue={defaults.headline}
           placeholder="Building a business that outlives me"
           maxLength={120}

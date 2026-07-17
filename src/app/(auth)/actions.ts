@@ -22,6 +22,11 @@ const signInSchema = z.object({
 const signUpSchema = z.object({
   firstName: z.string().min(1, "First name is required."),
   lastName: z.string().min(1, "Last name is required."),
+  headline: z
+    .string()
+    .trim()
+    .max(120, "Keep your headline under 120 characters.")
+    .optional(),
   email: z.string().email("Enter a valid email address."),
   password: z
     .string()
@@ -66,6 +71,7 @@ export async function signUp(
   const parsed = signUpSchema.safeParse({
     firstName: formData.get("firstName"),
     lastName: formData.get("lastName"),
+    headline: formData.get("headline") ?? undefined,
     email: formData.get("email"),
     password: formData.get("password"),
   });
@@ -111,6 +117,7 @@ export async function signUp(
       passwordHash: await hashPassword(parsed.data.password),
       firstName: parsed.data.firstName.trim(),
       lastName: parsed.data.lastName.trim(),
+      headline: parsed.data.headline || null,
       roles: { create: [{ roleId: menteeRole.id }] },
       notificationPrefs: {
         create: NOTIFICATION_TYPES.map((type) => ({ type, inApp: true })),

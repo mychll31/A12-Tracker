@@ -367,11 +367,11 @@ export function UsersClient({
 
           <div className="mt-4">
             <FormField
-              label="Headline"
+              label="Declaration"
               hint="Optional. Shown on their profile."
             >
               <Input
-                name="headline"
+                name="Declaration"
                 placeholder="Building a coaching practice"
               />
             </FormField>

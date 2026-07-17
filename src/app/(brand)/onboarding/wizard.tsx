@@ -405,7 +405,7 @@ export function OnboardingWizard({
                     id="a12-name"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    placeholder="e.g. Maychell"
+                    placeholder="e.g. Crisostomo"
                     autoComplete="given-name"
                     style={fieldStyle}
                   />

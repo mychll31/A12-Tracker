@@ -50,6 +50,7 @@ export default function RegisterPage() {
   // would blank out — state keeps what the user typed alongside the warning.
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [headline, setHeadline] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -190,7 +191,7 @@ export default function RegisterPage() {
                 id="a12-first"
                 name="firstName"
                 autoComplete="given-name"
-                placeholder="e.g. Maychell"
+                placeholder="e.g. Crisostomo"
                 required
                 value={firstName}
                 onChange={(event) => setFirstName(event.target.value)}
@@ -205,13 +206,30 @@ export default function RegisterPage() {
                 id="a12-last"
                 name="lastName"
                 autoComplete="family-name"
-                placeholder="e.g. Alcorin"
+                placeholder="e.g. Ibarra"
                 required
                 value={lastName}
                 onChange={(event) => setLastName(event.target.value)}
                 style={fieldStyle}
               />
             </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label htmlFor="a12-headline" style={labelStyle}>
+              Declaration
+            </label>
+            <input
+              id="a12-headline"
+              name="headline"
+              autoComplete="organization-title"
+              placeholder="e.g. I matter"
+              maxLength={120}
+              value={headline}
+              onChange={(event) => setHeadline(event.target.value)}
+              style={fieldStyle}
+            />
+            <p style={hintStyle}>Optional. Keep it under 120 characters.</p>
           </div>
 
           <div style={{ marginBottom: 16 }}>
