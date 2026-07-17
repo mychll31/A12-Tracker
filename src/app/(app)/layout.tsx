@@ -5,6 +5,7 @@ import { unreadCount } from "@/server/notifications";
 import { Sidebar } from "@/components/app-shell/sidebar";
 import { Topbar } from "@/components/app-shell/topbar";
 import { navFor } from "@/components/app-shell/nav-config";
+import { listCoachNavGroups } from "@/server/mentees";
 
 /**
  * The authenticated shell. Every route in the (app) group passes through
@@ -23,8 +24,11 @@ export default async function AppLayout({
   // wizard is what gives them something to come back to.
   if (user.needsOnboarding) redirect("/onboarding");
 
-  const unread = await unreadCount(user.id);
-  const sections = navFor(user);
+  const [unread, coachGroups] = await Promise.all([
+    unreadCount(user.id),
+    listCoachNavGroups(user),
+  ]);
+  const sections = navFor(user, { coachGroups });
 
   return (
     <div className="flex min-h-dvh">

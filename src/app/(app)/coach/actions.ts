@@ -3,10 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireCoach } from "@/lib/auth";
+import { requireCoach, type SessionUser } from "@/lib/auth";
 import { ForbiddenError } from "@/lib/rbac";
 import { NOTE_VISIBILITIES } from "@/lib/domain";
-import { createGroup, assignMenteeToGroup } from "@/server/admin";
+import {
+  assignMenteeToGroup,
+  createGroup,
+  removeMenteeFromGroup,
+  updateGroup,
+} from "@/server/admin";
 import { reviewCheckIn } from "@/server/check-ins";
 import {
   addActionItem,
@@ -26,7 +31,6 @@ import {
 
 import type { ActionState } from "../_lib/form-state";
 
-
 const ok = (): ActionState => ({ error: null, ok: true });
 const fail = (error: string): ActionState => ({ error, ok: false });
 
@@ -42,6 +46,12 @@ async function guard(run: () => Promise<void>): Promise<ActionState> {
   } catch (error) {
     if (error instanceof ForbiddenError) return fail(error.message);
     throw error;
+  }
+}
+
+function assertOwnsCouncil(actor: SessionUser, groupId: string): void {
+  if (!actor.coachGroupIds.includes(groupId)) {
+    throw new ForbiddenError("You do not lead that council.");
   }
 }
 
@@ -99,10 +109,13 @@ function firstIssue(error: z.ZodError): string {
 
 /** Every coach screen reads from the same handful of routes. */
 function revalidateCoach(menteeId?: string): void {
+  revalidatePath("/dashboard");
   revalidatePath("/coach");
   revalidatePath("/coach/notes");
   revalidatePath("/coach/mentees");
   revalidatePath("/coach/groups");
+  revalidatePath("/leaderboards");
+  revalidatePath("/organization");
   if (menteeId) revalidatePath(`/coach/mentees/${menteeId}`);
 }
 
@@ -349,7 +362,72 @@ export async function assignMenteeAction(
   if (!parsed.success) return fail(firstIssue(parsed.error));
 
   const state = await guard(async () => {
+    assertOwnsCouncil(actor, parsed.data.groupId);
     await assignMenteeToGroup(actor, parsed.data.menteeId, parsed.data.groupId);
+  });
+
+  if (state.ok) {
+    revalidateCoach(parsed.data.menteeId);
+    revalidatePath(`/coach/groups/${parsed.data.groupId}`);
+  }
+  return state;
+}
+
+const updateGroupSchema = z.object({
+  groupId: z.string().min(1),
+  name: z.string().trim().min(1, "Name the council."),
+});
+
+export async function updateGroupAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const actor = await requireCoach();
+
+  const parsed = updateGroupSchema.safeParse({
+    groupId: formData.get("groupId"),
+    name: formData.get("name"),
+  });
+
+  if (!parsed.success) return fail(firstIssue(parsed.error));
+
+  const state = await guard(async () => {
+    assertOwnsCouncil(actor, parsed.data.groupId);
+    await updateGroup(actor, parsed.data.groupId, { name: parsed.data.name });
+  });
+
+  if (state.ok) {
+    revalidateCoach();
+    revalidatePath(`/coach/groups/${parsed.data.groupId}`);
+  }
+  return state;
+}
+
+const removeMenteeSchema = z.object({
+  menteeId: z.string().min(1, "Choose a mentee."),
+  groupId: z.string().min(1),
+});
+
+export async function removeMenteeAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const actor = await requireCoach();
+
+  const parsed = removeMenteeSchema.safeParse({
+    menteeId: formData.get("menteeId"),
+    groupId: formData.get("groupId"),
+  });
+
+  if (!parsed.success) return fail(firstIssue(parsed.error));
+
+  const state = await guard(async () => {
+    assertOwnsCouncil(actor, parsed.data.groupId);
+    await removeMenteeFromGroup(
+      actor,
+      parsed.data.menteeId,
+      parsed.data.groupId,
+    );
   });
 
   if (state.ok) {

@@ -78,13 +78,15 @@ export function NavLinks({
             {section.items.map((item) => {
               const Icon = iconFor(item.icon);
               const active = isActive(pathname, item.href);
+              const hasChildren = Boolean(item.children?.length);
+              const current = pathname === item.href || (!hasChildren && active);
 
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     onClick={onNavigate}
-                    aria-current={active ? "page" : undefined}
+                    aria-current={current ? "page" : undefined}
                     className={cn(
                       "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                       active
@@ -102,6 +104,31 @@ export function NavLinks({
                     />
                     {item.label}
                   </Link>
+                  {item.children?.length ? (
+                    <ul className="ml-5 mt-1 space-y-0.5 border-l border-border pl-3">
+                      {item.children.map((child) => {
+                        const childActive = isActive(pathname, child.href);
+
+                        return (
+                          <li key={child.href}>
+                            <Link
+                              href={child.href}
+                              onClick={onNavigate}
+                              aria-current={childActive ? "page" : undefined}
+                              className={cn(
+                                "block truncate rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+                                childActive
+                                  ? "bg-primary-soft text-primary"
+                                  : "text-muted hover:bg-surface-sunken hover:text-foreground",
+                              )}
+                            >
+                              {child.label}
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : null}
                 </li>
               );
             })}

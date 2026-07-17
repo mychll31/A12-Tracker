@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { AlertTriangle, Flame, Users } from "lucide-react";
 
 import {
@@ -41,6 +42,7 @@ export interface MenteeTableProps {
   showGroup?: boolean;
   emptyTitle?: string;
   emptyDescription?: string;
+  actions?: (mentee: MenteeRow) => ReactNode;
 }
 
 export function MenteeTable({
@@ -48,6 +50,7 @@ export function MenteeTable({
   showGroup = true,
   emptyTitle = "No mentees yet",
   emptyDescription = "Once a mentee joins one of your councils they appear here, with their score and streak.",
+  actions,
 }: MenteeTableProps) {
   if (mentees.length === 0) {
     return (
@@ -76,6 +79,7 @@ export function MenteeTable({
           <TH>
             <span className="sr-only">Status</span>
           </TH>
+          {actions ? <TH className="text-right">Actions</TH> : null}
         </TR>
       </THead>
 
@@ -153,6 +157,12 @@ export function MenteeTable({
                   </Badge>
                 ) : null}
               </TD>
+
+              {actions ? (
+                <TD>
+                  <div className="flex justify-end">{actions(mentee)}</div>
+                </TD>
+              ) : null}
             </TR>
           );
         })}

@@ -5,6 +5,12 @@ export type NavItem = {
   label: string;
   /** lucide-react icon name, resolved in the client components. */
   icon: string;
+  children?: NavChildItem[];
+};
+
+export type NavChildItem = {
+  href: string;
+  label: string;
 };
 
 export type NavSection = {
@@ -20,7 +26,14 @@ export type NavSection = {
  * mentee — which the spec requires to work on a single account — simply gets
  * both blocks, instead of being forced to pick an identity.
  */
-export function navFor(user: SessionUser): NavSection[] {
+export type NavContext = {
+  coachGroups?: { id: string; name: string }[];
+};
+
+export function navFor(
+  user: SessionUser,
+  { coachGroups = [] }: NavContext = {},
+): NavSection[] {
   const sections: NavSection[] = [];
 
   if (user.isMentee) {
@@ -42,7 +55,15 @@ export function navFor(user: SessionUser): NavSection[] {
       items: [
         { href: "/coach", label: "Coach Dashboard", icon: "compass" },
         { href: "/coach/mentees", label: "Mentees", icon: "users" },
-        { href: "/coach/groups", label: "Councils", icon: "users-round" },
+        {
+          href: "/coach/groups",
+          label: "Councils",
+          icon: "users-round",
+          children: coachGroups.map((group) => ({
+            href: `/coach/groups/${group.id}`,
+            label: group.name,
+          })),
+        },
         { href: "/coach/notes", label: "Coaching Notes", icon: "file-text" },
         { href: "/organization", label: "Organization", icon: "building-2" },
       ],

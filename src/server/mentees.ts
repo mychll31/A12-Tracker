@@ -90,6 +90,11 @@ export type GroupDetail = {
   averageScore: number;
 };
 
+export type CoachNavGroup = {
+  id: string;
+  name: string;
+};
+
 /** Below this, a mentee needs a conversation rather than a leaderboard. */
 const AT_RISK_SCORE = 40;
 const STALE_DAYS = 7;
@@ -344,6 +349,26 @@ export async function listGroups(actor: SessionUser): Promise<GroupSummary[]> {
       memberCount: group.memberships.length,
       averageScore: averageScore(memberScores),
     };
+  });
+}
+
+export async function listCoachNavGroups(
+  actor: SessionUser,
+): Promise<CoachNavGroup[]> {
+  if (!actor.isCoach) return [];
+
+  return db.coachGroup.findMany({
+    where: {
+      organizationId: actor.organizationId,
+      coachId: actor.id,
+      isActive: true,
+      coach: { isActive: true },
+    },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+    },
   });
 }
 

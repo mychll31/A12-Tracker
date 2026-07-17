@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useId, useState } from "react";
-import { Plus, UserPlus } from "lucide-react";
+import { Pencil, Plus, UserMinus, UserPlus } from "lucide-react";
 
 import {
   Button,
@@ -13,7 +13,12 @@ import {
   useToast,
 } from "@/components/ui";
 
-import { assignMenteeAction, createGroupAction } from "../actions";
+import {
+  assignMenteeAction,
+  createGroupAction,
+  removeMenteeAction,
+  updateGroupAction,
+} from "../actions";
 import { INITIAL_ACTION_STATE } from "../../_lib/form-state";
 import type { ActionState } from "../../_lib/form-state";
 
@@ -198,5 +203,148 @@ export function AddMenteeButton({
         </form>
       </Modal>
     </>
+  );
+}
+
+export function EditGroupButton({
+  groupId,
+  currentName,
+}: {
+  groupId: string;
+  currentName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const formId = useId();
+  const { toast } = useToast();
+
+  const [state, formAction, pending] = useActionState(
+    async (prev: ActionState, formData: FormData): Promise<ActionState> => {
+      const result = await updateGroupAction(prev, formData);
+
+      if (result.ok) {
+        toast({
+          title: "Council renamed",
+          description: "The new name is visible across council views.",
+          variant: "success",
+        });
+        setOpen(false);
+      }
+
+      return result;
+    },
+    INITIAL_ACTION_STATE,
+  );
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        icon={<Pencil />}
+        onClick={() => setOpen(true)}
+      >
+        Edit name
+      </Button>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Edit council name"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => setOpen(false)}
+              disabled={pending}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" form={formId} isLoading={pending}>
+              Save name
+            </Button>
+          </>
+        }
+      >
+        <form id={formId} action={formAction} className="flex flex-col gap-5">
+          <input type="hidden" name="groupId" value={groupId} />
+
+          <FormField label="Name" required>
+            <Input
+              name="name"
+              defaultValue={currentName}
+              maxLength={80}
+              required
+            />
+          </FormField>
+
+          {state.error ? <ErrorNote message={state.error} /> : null}
+        </form>
+      </Modal>
+    </>
+  );
+}
+
+export function RemoveMenteeButton({
+  groupId,
+  menteeId,
+  menteeName,
+}: {
+  groupId: string;
+  menteeId: string;
+  menteeName: string;
+}) {
+  const { toast } = useToast();
+
+  const [state, formAction, pending] = useActionState(
+    async (prev: ActionState, formData: FormData): Promise<ActionState> => {
+      const result = await removeMenteeAction(prev, formData);
+
+      if (result.ok) {
+        toast({
+          title: "Mentee removed",
+          description: `${menteeName} no longer sits in this council.`,
+          variant: "success",
+        });
+      } else if (result.error) {
+        toast({
+          title: "Could not remove mentee",
+          description: result.error,
+          variant: "danger",
+        });
+      }
+
+      return result;
+    },
+    INITIAL_ACTION_STATE,
+  );
+
+  return (
+    <form
+      action={formAction}
+      onSubmit={(event) => {
+        if (
+          !window.confirm(
+            `Remove ${menteeName} from this council? They will be left without a council.`,
+          )
+        ) {
+          event.preventDefault();
+        }
+      }}
+      className="inline-flex justify-end"
+    >
+      <input type="hidden" name="groupId" value={groupId} />
+      <input type="hidden" name="menteeId" value={menteeId} />
+      <Button
+        type="submit"
+        variant="ghost"
+        size="sm"
+        icon={<UserMinus />}
+        isLoading={pending}
+        aria-label={`Remove ${menteeName} from this council`}
+      >
+        Remove
+      </Button>
+      {state.error ? <span className="sr-only">{state.error}</span> : null}
+    </form>
   );
 }

@@ -21,7 +21,11 @@ import {
 import { AreaTrendChart } from "@/components/charts";
 
 import { MenteeTable } from "../../mentee-table";
-import { AddMenteeButton } from "../group-actions";
+import {
+  AddMenteeButton,
+  EditGroupButton,
+  RemoveMenteeButton,
+} from "../group-actions";
 
 export const metadata: Metadata = { title: "Council" };
 
@@ -59,8 +63,9 @@ export default async function GroupDetailPage({
     throw error;
   }
 
-  // Only the coach who runs a group (or an admin) may place people into it.
-  const canManage = user.isAdmin || user.coachGroupIds.includes(id);
+  // On the coach surface, ownership is the assigned coach on the council.
+  // Admins still manage any council from /admin/groups.
+  const canManage = user.coachGroupIds.includes(id);
 
   const [trend, board, roster] = await Promise.all([
     groupTrend(user, id, TREND_DAYS),
@@ -118,7 +123,10 @@ export default async function GroupDetailPage({
           </div>
 
           {canManage ? (
-            <AddMenteeButton groupId={id} candidates={candidates} />
+            <div className="flex flex-wrap justify-end gap-2">
+              <EditGroupButton groupId={id} currentName={group.name} />
+              <AddMenteeButton groupId={id} candidates={candidates} />
+            </div>
           ) : (
             <Badge variant="neutral">View only</Badge>
           )}
@@ -163,6 +171,17 @@ export default async function GroupDetailPage({
               canManage
                 ? "Add a mentee to this council and they will appear here."
                 : "This council has no members yet."
+            }
+            actions={
+              canManage
+                ? (mentee) => (
+                    <RemoveMenteeButton
+                      groupId={id}
+                      menteeId={mentee.id}
+                      menteeName={`${mentee.firstName} ${mentee.lastName}`}
+                    />
+                  )
+                : undefined
             }
           />
         </CardContent>
