@@ -74,16 +74,14 @@ async function expectOnPage(path: string, cookie: string, must: string[]) {
 async function main() {
   console.log(`\nAbundance Hub — page content checks against ${BASE}\n`);
 
-  const mentee = await sessionFor("jonah@abundancehub.io");
+  const mentee = await sessionFor("tomas@abundancehub.io"); // Maychell's Circle
   const dual = await sessionFor("maychell@abundancehub.io");
   const admin = await sessionFor("admin@abundancehub.io");
 
   console.log("--- mentee ---");
   await expectOnPage("/dashboard", mentee, [
-    "Meditation",
-    "Coaching Call",
-    "Exercise",
-    "Everyday Learning",
+    "Welcome back",
+    "Goal Total Score",
   ]);
   await expectOnPage("/goals", mentee, [
     "Personal",
@@ -97,34 +95,33 @@ async function main() {
     "Gratitude",
     "Tomorrow",
   ]);
-  await expectOnPage("/leaderboards", mentee, ["Priya"]);
+  await expectOnPage("/leaderboards", mentee, ["Tomas"]);
   await expectOnPage("/achievements", mentee, ["unlocked"]);
 
   // The goal detail route — the one that shipped broken because a 200 was
   // mistaken for a working page. Assert the goal's own title reaches the DOM.
   const goal = await db.goal.findFirstOrThrow({
-    where: { user: { email: "jonah@abundancehub.io" } },
+    where: { user: { email: "tomas@abundancehub.io" } },
     select: { id: true, title: true },
   });
   await expectOnPage(`/goals/${goal.id}`, mentee, [goal.title, "Tasks"]);
 
   console.log("\n--- coach + mentee (one account, both surfaces) ---");
-  await expectOnPage("/dashboard", dual, ["Meditation"]);
-  await expectOnPage("/coach", dual, ["Priya", "Marcus", "Jonah"]);
-  await expectOnPage("/coach/mentees", dual, ["Priya", "Samuel"]);
+  await expectOnPage("/dashboard", dual, ["Goal Total Score"]);
+  await expectOnPage("/coach", dual, ["Coach Dashboard", "Total mentees"]);
+  await expectOnPage("/coach/mentees", dual, ["Priya", "Grace"]);
   await expectOnPage("/coach/goals", dual, ["My councils", "All mentees"]);
   await expectOnPage("/coach/goals?scope=all", dual, ["Priya", "Goal Score"]);
   await expectOnPage("/coach/groups", dual, [
     "Maychell's Circle",
-    "Diana's Circle",
-    "Raviel's Circle",
+    "Thursday momentum",
   ]);
-  await expectOnPage("/organization", dual, ["Diana", "Raviel"]);
+  await expectOnPage("/organization", dual, ["Diana", "Maychell"]);
 
   console.log("\n--- admin ---");
   await expectOnPage("/admin", admin, ["Recalculate"]);
   await expectOnPage("/admin/users", admin, ["maychell@abundancehub.io"]);
-  await expectOnPage("/admin/groups", admin, ["Diana's Circle"]);
+  await expectOnPage("/admin/groups", admin, ["Maychell's Circle"]);
   await expectOnPage("/admin/core-tasks", admin, [
     "Meditation",
     "Everyday Learning",
