@@ -55,6 +55,7 @@ export function navFor(
       items: [
         { href: "/coach", label: "Coach Dashboard", icon: "compass" },
         { href: "/coach/mentees", label: "Mentees", icon: "users" },
+        { href: "/coach/goals", label: "Goals", icon: "goal" },
         {
           href: "/coach/groups",
           label: "Councils",
