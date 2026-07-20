@@ -107,3 +107,52 @@ scoring for a whole list in a fixed number of queries.
   needed, following existing patterns in the coach area.
 - `src/server/goals.ts` — new `listMenteeGoals` function and its return type.
 - `src/components/app-shell/nav-config.ts` — new nav item.
+
+## Update 2026-07-20: Filters & back navigation
+
+Follow-up on the shipped board. Two additions.
+
+### Filters
+
+The `My councils / All mentees` toggle is replaced by a **filter bar** — a GET
+form whose state lives entirely in the URL (shareable, refresh-safe), matching
+the Mentees page pattern. Filters:
+
+1. **Council** — one dropdown: *All my councils* (default, `council` unset) ·
+   each council the coach leads (by id) · *All mentees* (`council=all`).
+2. **Mentee** — `search` text, matched against first/last name.
+3. **Category** — All · Personal · Professional · Contribution (`category`).
+4. **Score condition** — an operator `op` (`gte` ≥ · `gt` > · `eq` = · `lt` <)
+   plus a `score` percentage. "Any" (unset) means no score filter.
+
+A single Category selector serves both the category filter and the score
+condition's category — so "personal goal at 100%" is Category *Personal* +
+`op=gte` + `score=100`. One condition at a time.
+
+Combination rules:
+- **Council + Mentee** choose the set of mentees.
+- **Category + Score** filter each mentee's displayed goal rows.
+- When a goal-level filter (category or score) is active, mentees with no
+  matching goal drop out of the list. Otherwise every mentee shows, as before.
+- A mentee's **Goal Total Score** and missing-category flags are still computed
+  from *all* their goals — filtering is a display lens, never a recomputation.
+- A score condition excludes abandoned goals (score `null`).
+
+`listMenteeGoals(actor, filter)` takes the filter object; council resolution
+reuses `coachMenteeIds` (all my councils), `groupMemberIds` (a specific council
+the coach leads), and the org-wide MENTEE query (all mentees).
+
+### Back navigation
+
+Board rows carry `?from=<board-url-with-filters>` when they link to a goal
+(`/goals/[id]`) or a mentee (`/coach/mentees/[id]`). Those two pages read
+`from`; when it is a `/coach/goals` path (validated by prefix, so it cannot be
+abused as an open redirect) the top link becomes **"← Back to Goals"** and
+returns to the board with filters intact. With no valid `from`, the existing
+links ("Back to my goals" / "← All mentees") are unchanged.
+
+### Additional files touched
+
+- `src/app/(app)/goals/[id]/page.tsx` — read `from`, context-aware back link.
+- `src/app/(app)/coach/mentees/[id]/page.tsx` — read `from`, context-aware back
+  link.
