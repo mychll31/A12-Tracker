@@ -294,6 +294,11 @@ export function NewGoalDialog({
           ) : null}
 
           <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
+            {!isMerit && filled === 0 ? (
+              <p className="mr-auto text-xs text-muted">
+                Add at least one action plan to create a milestone goal.
+              </p>
+            ) : null}
             <Button
               variant="ghost"
               onClick={() => setOpen(false)}
@@ -301,7 +306,11 @@ export function NewGoalDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" isLoading={pending}>
+            <Button
+              type="submit"
+              isLoading={pending}
+              disabled={!isMerit && filled === 0}
+            >
               Create goal
             </Button>
           </div>

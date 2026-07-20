@@ -551,6 +551,17 @@ export async function createGoal(
     .map((t) => t.trim())
     .filter((t) => t.length > 0);
 
+  // A merit goal is scored by its measure, so it needs a target; a milestone
+  // goal is scored by its plans, so it needs at least one. Without this a merit
+  // goal with no target scores 0 forever, and a milestone with no plans can
+  // never move — exactly the confusing states this guards against.
+  if (goalType === "MERIT" && targetValue <= 0) {
+    throw new ForbiddenError("A merit goal needs a target value greater than 0.");
+  }
+  if (isMilestone && planTitles.length === 0) {
+    throw new ForbiddenError("A milestone goal needs at least one action plan.");
+  }
+
   const goal = await db.goal.create({
     data: {
       userId: input.userId,
@@ -634,6 +645,27 @@ export async function updateGoal(
     : input.currentValue !== undefined
       ? Math.max(0, input.currentValue)
       : goal.currentValue;
+
+  // Shape validation runs only when the caller is editing the goal's type or
+  // measure — a plain status change (the status dropdown) must never be blocked,
+  // and many existing merit goals predate this rule and carry no target.
+  const editingShape =
+    input.goalType !== undefined || input.targetValue !== undefined;
+  if (editingShape) {
+    if (goalType === "MERIT" && targetValue <= 0) {
+      throw new ForbiddenError(
+        "A merit goal needs a target value greater than 0.",
+      );
+    }
+    if (isMilestone) {
+      const planCount = await db.goalTask.count({ where: { goalId } });
+      if (planCount === 0) {
+        throw new ForbiddenError(
+          "A milestone goal needs at least one action plan.",
+        );
+      }
+    }
+  }
 
   // Progress mirrors the score: the measure for MERIT, plan completion for
   // MILESTONE, pinned to 100 when the goal is marked complete.

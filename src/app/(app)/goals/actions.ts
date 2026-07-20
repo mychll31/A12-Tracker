@@ -67,12 +67,44 @@ const createSchema = z.object({
     .transform((value) => (value ? value.trim() : "")),
   targetDate: dayField,
   notes: optionalText,
-  // Action plans are optional — a goal is scored by its measure, not its plans.
+  // Action plans are optional for MERIT — a merit goal is scored by its measure,
+  // not its plans. MILESTONE requires at least one (checked below).
   plans: z
     .array(z.string())
     .transform((values) =>
       values.map((value) => value.trim()).filter((value) => value.length > 0),
     ),
+});
+
+/**
+ * The two shape invariants a goal type carries: a MERIT goal is scored by a
+ * measure, so it needs a target above 0; a MILESTONE goal is scored by its
+ * plans, so it needs at least one. Enforced here for a friendly form message,
+ * and again in the server layer as the authoritative backstop.
+ */
+const meritNeedsTarget = (
+  goalType: string,
+  targetValue: number,
+  ctx: z.RefinementCtx,
+) => {
+  if (goalType === "MERIT" && targetValue <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["targetValue"],
+      message: "A merit goal needs a target value greater than 0.",
+    });
+  }
+};
+
+const createSchemaChecked = createSchema.superRefine((data, ctx) => {
+  meritNeedsTarget(data.goalType, data.targetValue, ctx);
+  if (data.goalType === "MILESTONE" && data.plans.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["plans"],
+      message: "A milestone goal needs at least one action plan.",
+    });
+  }
 });
 
 export async function createGoalAction(
@@ -81,7 +113,7 @@ export async function createGoalAction(
 ): Promise<GoalFormState> {
   const actor = await requireUser();
 
-  const parsed = createSchema.safeParse({
+  const parsed = createSchemaChecked.safeParse({
     userId: formData.get("userId") ?? undefined,
     title: formData.get("title"),
     description: formData.get("description") ?? undefined,
@@ -148,6 +180,11 @@ const updateSchema = z.object({
     .transform((value) => (value ? value.trim() : "")),
   targetDate: dayField,
   notes: optionalText,
+}).superRefine((data, ctx) => {
+  // MILESTONE's "needs a plan" rule can't be checked here — the edit form does
+  // not carry plans (they are managed on the detail page) — so the server layer
+  // enforces it. Target > 0 for MERIT is checkable and enforced here too.
+  meritNeedsTarget(data.goalType, data.targetValue, ctx);
 });
 
 export async function updateGoalAction(
