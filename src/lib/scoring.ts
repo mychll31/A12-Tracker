@@ -99,8 +99,9 @@ export type ScorableGoal = {
  *   ABANDONED  — null, i.e. withdrawn from the average rather than scored zero.
  *                If dropping a goal you have outgrown permanently damaged your
  *                score, nobody would ever drop one honestly.
- *   no target  — falls back to the goal's own progress field, so a goal without
- *                a measure set still scores rather than reading as zero.
+ *   no target  — 0. Without a measurable target the goal has not started
+ *                scoring (the detail page says exactly that); a stale `progress`
+ *                must never resurrect a phantom score. COMPLETED still wins above.
  */
 export function scoreGoal(goal: ScorableGoal): number | null {
   const status = asGoalStatus(goal.status);
@@ -122,7 +123,9 @@ export function scoreGoal(goal: ScorableGoal): number | null {
   if (goal.targetValue > 0) {
     return round(clamp((goal.currentValue / goal.targetValue) * 100));
   }
-  return clamp(goal.progress);
+  // No measurable target set — the goal has not started scoring yet, so it is 0,
+  // never a stale prior `progress`.
+  return 0;
 }
 
 /**

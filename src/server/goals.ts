@@ -197,18 +197,15 @@ function isOverdueGoal(targetDate: Date, status: GoalStatus): boolean {
 /**
  * The stored `progress` column mirrors the goal's score — its numeric measure —
  * so lists and charts read one column. It must use the same rule scoreGoal()
- * does (current ÷ target), or the bar and the score would disagree. Falls back
- * to the passed value when no target is set.
+ * does (current ÷ target), or the bar and the score would disagree — including
+ * the no-target case, which is 0: an unmeasured goal has not started scoring, so
+ * `progress` can never carry a stale value forward.
  */
-function measurePct(
-  targetValue: number,
-  currentValue: number,
-  fallback: number,
-): number {
+function measurePct(targetValue: number, currentValue: number): number {
   if (targetValue > 0) {
     return clampPct(Math.round((currentValue / targetValue) * 100));
   }
-  return clampPct(fallback);
+  return 0;
 }
 
 /** Informational only: the mean status weight across a goal's action plans. */
@@ -570,7 +567,7 @@ export async function createGoal(
       currentValue,
       unit: isMilestone ? "" : (input.unit?.trim() ?? ""),
       // MERIT mirrors its measure; a fresh MILESTONE has no plans done yet, so 0.
-      progress: isMilestone ? 0 : measurePct(targetValue, currentValue, 0),
+      progress: isMilestone ? 0 : measurePct(targetValue, currentValue),
       tasks: {
         create: planTitles.map((title, index) => ({
           title,
@@ -652,7 +649,7 @@ export async function updateGoal(
     });
     progressTo = planCompletionOf(plans);
   } else {
-    progressTo = measurePct(targetValue, currentValue, progressFrom);
+    progressTo = measurePct(targetValue, currentValue);
   }
 
   await db.goal.update({
@@ -722,7 +719,7 @@ export async function setGoalMeasure(
   const progressTo =
     statusFrom === "COMPLETED"
       ? 100
-      : measurePct(goal.targetValue, current, progressFrom);
+      : measurePct(goal.targetValue, current);
 
   await db.goal.update({
     where: { id: goalId },
@@ -940,7 +937,7 @@ async function addMerit(
   const progressTo =
     status === "COMPLETED"
       ? 100
-      : measurePct(goal.targetValue, newCurrent, progressFrom);
+      : measurePct(goal.targetValue, newCurrent);
 
   await db.goal.update({
     where: { id: goal.id },
