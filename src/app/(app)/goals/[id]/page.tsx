@@ -50,11 +50,19 @@ function formatBytes(size: number): string {
 
 export default async function GoalDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   const { id } = await params;
+  const { from } = await searchParams;
   const user = await requireUser();
+
+  // A `from` that points back to the coach Goals board turns the top link into
+  // "Back to Goals". Prefix-validated so it can only ever be that board (never
+  // an open redirect to another origin).
+  const backToBoard = from?.startsWith("/coach/goals") ? from : null;
 
   let goal: GoalDetail;
   try {
@@ -69,10 +77,10 @@ export default async function GoalDetailPage({
         description={error.message}
         action={
           <Link
-            href="/goals"
+            href={backToBoard ?? "/goals"}
             className="text-sm font-medium text-primary hover:underline"
           >
-            Back to my goals
+            {backToBoard ? "Back to Goals" : "Back to my goals"}
           </Link>
         }
       />
@@ -85,11 +93,11 @@ export default async function GoalDetailPage({
     <div className="animate-slide-up flex flex-col gap-8">
       <div>
         <Link
-          href="/goals"
+          href={backToBoard ?? "/goals"}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-foreground"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
-          My goals
+          {backToBoard ? "Back to Goals" : "My goals"}
         </Link>
       </div>
 

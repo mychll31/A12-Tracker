@@ -68,11 +68,18 @@ const CHECK_IN_LIMIT = 20;
 
 export default async function MenteeDrilldownPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   const user = await requireCoach();
   const { id } = await params;
+  const { from } = await searchParams;
+
+  // Arriving from the coach Goals board? Offer a link straight back to it (with
+  // its filters). Prefix-validated, so it can only be that board.
+  const backToBoard = from?.startsWith("/coach/goals") ? from : null;
 
   let profile;
   try {
@@ -143,10 +150,10 @@ export default async function MenteeDrilldownPage({
     <div className="animate-slide-up flex flex-col gap-8">
       <header className="flex flex-col gap-5">
         <Link
-          href="/coach/mentees"
+          href={backToBoard ?? "/coach/mentees"}
           className="w-fit text-xs text-muted hover:text-foreground"
         >
-          ← All mentees
+          {backToBoard ? "← Back to Goals" : "← All mentees"}
         </Link>
 
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
