@@ -6,6 +6,8 @@ import {
   ForbiddenError,
   assertCanEditMentee,
   assertCanViewUser,
+  coachMenteeIds,
+  visibleUserIds,
 } from "@/lib/rbac";
 import {
   ACTION_PLAN_STATUSES,
@@ -1157,4 +1159,134 @@ export async function requiredGoalGaps(
 
   const held = new Set(goals.map((g) => asGoalCategoryKey(g.category.key)));
   return GOAL_CATEGORY_KEYS.filter((key) => !held.has(key));
+}
+
+// ---------------------------------------------------------------------------
+// Coach Goals Board — every mentee's goals in one bounded read
+// ---------------------------------------------------------------------------
+
+export type MenteeGoalsGroup = {
+  mentee: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl: string | null;
+  };
+  /** The mentee's Goal Total Score (the three categories combined), 0-100. */
+  goalTotalScore: number;
+  /** Overdue first, then at-risk, then soonest due. */
+  goals: GoalSummary[];
+  /** Required categories this mentee holds no (non-abandoned) goal in. */
+  missingCategories: GoalCategoryKey[];
+};
+
+/**
+ * The Goals Board's single read: every mentee in scope with their goals, Goal
+ * Total Score and required-category gaps.
+ *
+ * Bounded queries regardless of roster size — no per-mentee loop. One query to
+ * resolve the id set, then identities and every goal for the set in parallel;
+ * grouping and scoring happen in memory, mirroring cardsForUserIds in
+ * src/server/mentees.ts. Scores come from the same engine the leaderboards use,
+ * so the number here can never diverge from a mentee's ranked score.
+ */
+export async function listMenteeGoals(
+  actor: SessionUser,
+  opts: { scope: "councils" | "all" },
+): Promise<MenteeGoalsGroup[]> {
+  // 1. Resolve the mentee id set for the chosen scope.
+  let menteeIds: string[];
+  if (opts.scope === "councils") {
+    menteeIds = await coachMenteeIds(actor.id);
+  } else {
+    // "All" = every mentee the coach may view. visibleUserIds returns null for a
+    // coach ("whole org"), so fall back to an org-wide MENTEE query, exactly as
+    // listMentees does.
+    const allowed = await visibleUserIds(actor);
+    const rows = await db.user.findMany({
+      where: {
+        organizationId: actor.organizationId,
+        isActive: true,
+        roles: { some: { role: { key: "MENTEE" } } },
+        ...(allowed === null ? {} : { id: { in: allowed } }),
+      },
+      select: { id: true },
+    });
+    menteeIds = rows.map((r) => r.id);
+  }
+
+  if (menteeIds.length === 0) return [];
+
+  // 2 & 3. Identities and all their goals, in two queries.
+  const [users, goals] = await Promise.all([
+    db.user.findMany({
+      where: { id: { in: menteeIds }, isActive: true },
+      select: { id: true, firstName: true, lastName: true, avatarUrl: true },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    }),
+    db.goal.findMany({
+      where: { userId: { in: menteeIds } },
+      orderBy: [{ targetDate: "asc" }, { createdAt: "desc" }],
+      include: {
+        category: categorySelect,
+        tasks: { select: { status: true } },
+      },
+    }),
+  ]);
+
+  // Group the raw goal rows by owner (rows still carry task statuses, which the
+  // category scorer needs for MILESTONE goals).
+  const rowsByUser = new Map<string, typeof goals>();
+  for (const goal of goals) {
+    const list = rowsByUser.get(goal.userId);
+    if (list) list.push(goal);
+    else rowsByUser.set(goal.userId, [goal]);
+  }
+
+  // Overdue first, then AT_RISK, then soonest due.
+  const rank = (g: GoalSummary) =>
+    g.isOverdue ? 0 : g.status === "AT_RISK" ? 1 : 2;
+
+  return users.map((user) => {
+    const rows = rowsByUser.get(user.id) ?? [];
+
+    const summaries = rows
+      .map(toSummary)
+      .sort((a, b) => rank(a) - rank(b) || a.daysUntilDue - b.daysUntilDue);
+
+    const goalTotalScore = weightGoalScore(
+      scoreCategories(
+        rows.map((g) => ({
+          status: g.status,
+          progress: g.progress,
+          categoryKey: g.category.key,
+          goalType: g.goalType,
+          targetValue: g.targetValue,
+          currentValue: g.currentValue,
+          tasks: g.tasks,
+        })),
+      ),
+    );
+
+    // An abandoned goal doesn't count as "holding" a category — matches
+    // requiredGoalGaps.
+    const held = new Set(
+      rows
+        .filter((g) => asGoalStatus(g.status) !== "ABANDONED")
+        .map((g) => asGoalCategoryKey(g.category.key)),
+    );
+    const missingCategories = GOAL_CATEGORY_KEYS.filter((k) => !held.has(k));
+
+    return {
+      mentee: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        avatarUrl: user.avatarUrl,
+      },
+      goalTotalScore,
+      goals: summaries,
+      missingCategories,
+    };
+  });
 }
