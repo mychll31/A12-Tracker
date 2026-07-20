@@ -49,8 +49,10 @@ export default async function CoachGoalsPage({
   const user = await requireCoach();
   const sp = await searchParams;
 
-  // Normalise the raw query into a typed filter.
-  const council = sp.council ?? "";
+  // Normalise the raw query into a typed filter. A bare /coach/goals (the nav
+  // link) defaults to every mentee; the empty-string council value is the
+  // explicit "all my councils" choice.
+  const council = sp.council ?? "all";
   const search = sp.search?.trim() || undefined;
   const category = (GOAL_CATEGORY_KEYS as readonly string[]).includes(
     sp.category ?? "",
@@ -80,7 +82,9 @@ export default async function CoachGoalsPage({
   // Rebuild the canonical board URL so every drill-in link can return here with
   // the same filters. Only well-formed params are echoed back.
   const qs = new URLSearchParams();
-  if (council) qs.set("council", council);
+  // Echo council whenever it differs from the "all mentees" default — including
+  // the empty-string "all my councils" choice — so the back-link restores it.
+  if (council !== "all") qs.set("council", council);
   if (search) qs.set("search", search);
   if (category) qs.set("category", category);
   if (scoreOp) qs.set("op", scoreOp);
@@ -88,7 +92,10 @@ export default async function CoachGoalsPage({
   const boardUrl = qs.toString() ? `/coach/goals?${qs.toString()}` : "/coach/goals";
   const fromQuery = `from=${encodeURIComponent(boardUrl)}`;
 
-  const filtersActive = Boolean(council || search || category || scoreOp);
+  // A goal/mentee narrowing, or any council other than the "all mentees"
+  // default, counts as filtered (so Clear appears and returns to the default).
+  const narrowed = Boolean(search || category || scoreOp);
+  const filtersActive = narrowed || council !== "all";
 
   const councilOptions = [
     { value: "", label: "All my councils" },
@@ -223,18 +230,18 @@ export default async function CoachGoalsPage({
         <EmptyState
           icon={Target}
           title={
-            filtersActive
+            narrowed
               ? "Nothing matches these filters"
               : council === "all"
                 ? "No mentees to show"
-                : "No mentees in your councils yet"
+                : "No mentees in these councils yet"
           }
           description={
-            filtersActive
+            narrowed
               ? "No mentee or goal matches the current filters. Try widening them."
               : council === "all"
                 ? "No mentee in the organization is visible to you yet."
-                : "Once mentees are placed in a council you lead, their goals gather here."
+                : "Once mentees are placed in the selected council, their goals gather here."
           }
           action={
             filtersActive ? (

@@ -118,8 +118,10 @@ The `My councils / All mentees` toggle is replaced by a **filter bar** — a GET
 form whose state lives entirely in the URL (shareable, refresh-safe), matching
 the Mentees page pattern. Filters:
 
-1. **Council** — one dropdown: *All my councils* (default, `council` unset) ·
-   each council the coach leads (by id) · *All mentees* (`council=all`).
+1. **Council** — one dropdown: *All mentees* (default; `council` unset or
+   `council=all`) · *All my councils* (`council=`, empty string) · each council
+   the coach leads (by id). A bare `/coach/goals` from the nav lands on all
+   mentees.
 2. **Mentee** — `search` text, matched against first/last name.
 3. **Category** — All · Personal · Professional · Contribution (`category`).
 4. **Score condition** — an operator `op` (`gte` ≥ · `gt` > · `eq` = · `lt` <)
