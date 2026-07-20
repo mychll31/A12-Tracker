@@ -112,6 +112,8 @@ async function main() {
   await expectOnPage("/dashboard", dual, ["Meditation"]);
   await expectOnPage("/coach", dual, ["Priya", "Marcus", "Jonah"]);
   await expectOnPage("/coach/mentees", dual, ["Priya", "Samuel"]);
+  await expectOnPage("/coach/goals", dual, ["My councils", "All mentees"]);
+  await expectOnPage("/coach/goals?scope=all", dual, ["Priya", "Goal Score"]);
   await expectOnPage("/coach/groups", dual, [
     "Maychell's Circle",
     "Diana's Circle",
