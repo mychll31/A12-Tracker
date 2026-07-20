@@ -7,6 +7,7 @@ import {
   assertCanEditMentee,
   assertCanViewUser,
   coachMenteeIds,
+  groupMemberIds,
   visibleUserIds,
 } from "@/lib/rbac";
 import {
@@ -1180,59 +1181,90 @@ export type MenteeGoalsGroup = {
   missingCategories: GoalCategoryKey[];
 };
 
+export type MenteeGoalsFilter = {
+  /** "" = all my councils, "all" = every visible mentee, else a council id I lead. */
+  council?: string;
+  /** Matched (case-insensitively by SQLite's default collation) against name. */
+  search?: string;
+  /** Keep only goals in this category. */
+  category?: GoalCategoryKey;
+  /** Score comparison operator; only takes effect together with scoreValue. */
+  scoreOp?: "gte" | "gt" | "eq" | "lt";
+  /** The percentage the operator compares a goal's score against. */
+  scoreValue?: number;
+};
+
 /**
  * The Goals Board's single read: every mentee in scope with their goals, Goal
  * Total Score and required-category gaps.
  *
  * Bounded queries regardless of roster size — no per-mentee loop. One query to
- * resolve the id set, then identities and every goal for the set in parallel;
- * grouping and scoring happen in memory, mirroring cardsForUserIds in
- * src/server/mentees.ts. Scores come from the same engine the leaderboards use,
- * so the number here can never diverge from a mentee's ranked score.
+ * resolve the id set, then identities and every goal for the set; grouping and
+ * scoring happen in memory, mirroring cardsForUserIds in src/server/mentees.ts.
+ * Scores come from the same engine the leaderboards use, so the number here can
+ * never diverge from a mentee's ranked score.
+ *
+ * Council + search pick the set of mentees; category + score filter each
+ * mentee's displayed goals. A mentee's Goal Total Score and missing-category
+ * flags always reflect ALL their goals — filtering is a display lens, never a
+ * recomputation — but when a goal-level filter is active, a mentee with no
+ * matching goal drops out of the list entirely.
  */
 export async function listMenteeGoals(
   actor: SessionUser,
-  opts: { scope: "councils" | "all" },
+  filter: MenteeGoalsFilter = {},
 ): Promise<MenteeGoalsGroup[]> {
-  // 1. Resolve the mentee id set for the chosen scope.
-  let menteeIds: string[];
-  if (opts.scope === "councils") {
-    menteeIds = await coachMenteeIds(actor.id);
-  } else {
-    // "All" = every mentee the coach may view. visibleUserIds returns null for a
-    // coach ("whole org"), so fall back to an org-wide MENTEE query, exactly as
-    // listMentees does.
-    const allowed = await visibleUserIds(actor);
-    const rows = await db.user.findMany({
-      where: {
-        organizationId: actor.organizationId,
-        isActive: true,
-        roles: { some: { role: { key: "MENTEE" } } },
-        ...(allowed === null ? {} : { id: { in: allowed } }),
-      },
-      select: { id: true },
-    });
-    menteeIds = rows.map((r) => r.id);
-  }
+  const council = filter.council ?? "";
+  const search = filter.search?.trim();
 
-  if (menteeIds.length === 0) return [];
+  const isAll = council === "all";
+  // "All" = every mentee the coach may view (visibleUserIds is null = whole org).
+  // A specific council the coach leads uses its membership; otherwise all their
+  // councils' members. coachGroupIds only holds the coach's own active groups,
+  // so a stray/foreign council id harmlessly falls back to "all my councils".
+  const allowed = isAll ? await visibleUserIds(actor) : null;
+  const scopedIds = isAll
+    ? null
+    : council && actor.coachGroupIds.includes(council)
+      ? await groupMemberIds(council)
+      : await coachMenteeIds(actor.id);
 
-  // 2 & 3. Identities and all their goals, in two queries.
-  const [users, goals] = await Promise.all([
-    db.user.findMany({
-      where: { id: { in: menteeIds }, isActive: true },
-      select: { id: true, firstName: true, lastName: true, avatarUrl: true },
-      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-    }),
-    db.goal.findMany({
-      where: { userId: { in: menteeIds } },
-      orderBy: [{ targetDate: "asc" }, { createdAt: "desc" }],
-      include: {
-        category: categorySelect,
-        tasks: { select: { status: true } },
-      },
-    }),
-  ]);
+  if (!isAll && (scopedIds?.length ?? 0) === 0) return [];
+
+  const users = await db.user.findMany({
+    where: {
+      isActive: true,
+      ...(isAll
+        ? {
+            organizationId: actor.organizationId,
+            roles: { some: { role: { key: "MENTEE" } } },
+            ...(allowed === null ? {} : { id: { in: allowed } }),
+          }
+        : { id: { in: scopedIds ?? [] } }),
+      ...(search
+        ? {
+            OR: [
+              { firstName: { contains: search } },
+              { lastName: { contains: search } },
+            ],
+          }
+        : {}),
+    },
+    select: { id: true, firstName: true, lastName: true, avatarUrl: true },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+  });
+
+  if (users.length === 0) return [];
+
+  const userIds = users.map((u) => u.id);
+  const goals = await db.goal.findMany({
+    where: { userId: { in: userIds } },
+    orderBy: [{ targetDate: "asc" }, { createdAt: "desc" }],
+    include: {
+      category: categorySelect,
+      tasks: { select: { status: true } },
+    },
+  });
 
   // Group the raw goal rows by owner (rows still carry task statuses, which the
   // category scorer needs for MILESTONE goals).
@@ -1247,12 +1279,41 @@ export async function listMenteeGoals(
   const rank = (g: GoalSummary) =>
     g.isOverdue ? 0 : g.status === "AT_RISK" ? 1 : 2;
 
-  return users.map((user) => {
+  // Goal-level filters. A score condition without a value is inert.
+  const hasScore =
+    filter.scoreOp !== undefined && filter.scoreValue !== undefined;
+  const goalFilterActive = Boolean(filter.category) || hasScore;
+
+  const passesScore = (score: number | null): boolean => {
+    if (!hasScore) return true;
+    if (score === null) return false; // abandoned — out when a score filter is set
+    switch (filter.scoreOp) {
+      case "gte":
+        return score >= filter.scoreValue!;
+      case "gt":
+        return score > filter.scoreValue!;
+      case "eq":
+        return score === filter.scoreValue!;
+      case "lt":
+        return score < filter.scoreValue!;
+      default:
+        return true;
+    }
+  };
+  const passesCategory = (g: GoalSummary): boolean =>
+    !filter.category || g.category.key === filter.category;
+
+  const groups: MenteeGoalsGroup[] = [];
+  for (const user of users) {
     const rows = rowsByUser.get(user.id) ?? [];
 
-    const summaries = rows
+    const displayed = rows
       .map(toSummary)
+      .filter((g) => passesCategory(g) && passesScore(g.score))
       .sort((a, b) => rank(a) - rank(b) || a.daysUntilDue - b.daysUntilDue);
+
+    // A goal-level filter turns the board into a search: hide the misses.
+    if (goalFilterActive && displayed.length === 0) continue;
 
     const goalTotalScore = weightGoalScore(
       scoreCategories(
@@ -1277,7 +1338,7 @@ export async function listMenteeGoals(
     );
     const missingCategories = GOAL_CATEGORY_KEYS.filter((k) => !held.has(k));
 
-    return {
+    groups.push({
       mentee: {
         id: user.id,
         firstName: user.firstName,
@@ -1285,8 +1346,10 @@ export async function listMenteeGoals(
         avatarUrl: user.avatarUrl,
       },
       goalTotalScore,
-      goals: summaries,
+      goals: displayed,
       missingCategories,
-    };
-  });
+    });
+  }
+
+  return groups;
 }

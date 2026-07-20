@@ -1,16 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, Target } from "lucide-react";
+import { AlertTriangle, Search, Target } from "lucide-react";
 
 import { requireCoach } from "@/lib/auth";
-import { listMenteeGoals } from "@/server/goals";
+import { listMenteeGoals, type MenteeGoalsFilter } from "@/server/goals";
+import { listCoachNavGroups } from "@/server/mentees";
+import { GOAL_CATEGORY_KEYS, type GoalCategoryKey } from "@/lib/domain";
 import { formatDate } from "@/lib/dates";
 import { cn, formatScore } from "@/lib/utils";
 import {
   Avatar,
   Badge,
+  Button,
   EmptyState,
+  Input,
   ProgressBar,
+  Select,
   StatusBadge,
 } from "@/components/ui";
 
@@ -21,14 +26,20 @@ export const metadata: Metadata = { title: "Goals" };
 
 /**
  * Every mentee's goals on one page, grouped by mentee. Read-only: rows link out
- * to the existing goal and profile pages. Scope lives in the URL, and each
- * mentee is a native <details> block, so the page ships no client JavaScript.
+ * to the existing goal and profile pages (carrying a `from` so those pages can
+ * offer a "Back to Goals" link). Filters live entirely in the URL — a GET form,
+ * server-rendered, no client JavaScript.
  */
 
-type SearchParams = Promise<{ scope?: string }>;
+type SearchParams = Promise<{
+  council?: string;
+  search?: string;
+  category?: string;
+  op?: string;
+  score?: string;
+}>;
 
-const asScope = (value: string | undefined): "councils" | "all" =>
-  value === "all" ? "all" : "councils";
+const SCORE_OPS = ["gte", "gt", "eq", "lt"] as const;
 
 export default async function CoachGoalsPage({
   searchParams,
@@ -36,23 +47,72 @@ export default async function CoachGoalsPage({
   searchParams: SearchParams;
 }) {
   const user = await requireCoach();
-  const { scope: scopeParam } = await searchParams;
-  const scope = asScope(scopeParam);
+  const sp = await searchParams;
 
-  const groups = await listMenteeGoals(user, { scope });
+  // Normalise the raw query into a typed filter.
+  const council = sp.council ?? "";
+  const search = sp.search?.trim() || undefined;
+  const category = (GOAL_CATEGORY_KEYS as readonly string[]).includes(
+    sp.category ?? "",
+  )
+    ? (sp.category as GoalCategoryKey)
+    : undefined;
+  const scoreOp = (SCORE_OPS as readonly string[]).includes(sp.op ?? "")
+    ? (sp.op as (typeof SCORE_OPS)[number])
+    : undefined;
+  const parsedScore =
+    sp.score !== undefined && sp.score !== "" ? Number(sp.score) : NaN;
+  const scoreValue = scoreOp && Number.isFinite(parsedScore) ? parsedScore : undefined;
 
-  const scopes = [
-    { key: "councils" as const, label: "My councils", href: "/coach/goals" },
-    {
-      key: "all" as const,
-      label: "All mentees",
-      href: "/coach/goals?scope=all",
-    },
+  const filter: MenteeGoalsFilter = {
+    council,
+    search,
+    category,
+    scoreOp,
+    scoreValue,
+  };
+
+  const [groups, councils] = await Promise.all([
+    listMenteeGoals(user, filter),
+    listCoachNavGroups(user),
+  ]);
+
+  // Rebuild the canonical board URL so every drill-in link can return here with
+  // the same filters. Only well-formed params are echoed back.
+  const qs = new URLSearchParams();
+  if (council) qs.set("council", council);
+  if (search) qs.set("search", search);
+  if (category) qs.set("category", category);
+  if (scoreOp) qs.set("op", scoreOp);
+  if (scoreValue !== undefined) qs.set("score", String(scoreValue));
+  const boardUrl = qs.toString() ? `/coach/goals?${qs.toString()}` : "/coach/goals";
+  const fromQuery = `from=${encodeURIComponent(boardUrl)}`;
+
+  const filtersActive = Boolean(council || search || category || scoreOp);
+
+  const councilOptions = [
+    { value: "", label: "All my councils" },
+    ...councils.map((c) => ({ value: c.id, label: c.name })),
+    { value: "all", label: "All mentees" },
+  ];
+  const categoryOptions = [
+    { value: "", label: "All categories" },
+    ...GOAL_CATEGORY_KEYS.map((k) => ({
+      value: k,
+      label: GOAL_CATEGORY_LABELS[k],
+    })),
+  ];
+  const opOptions = [
+    { value: "", label: "Any score" },
+    { value: "gte", label: "≥" },
+    { value: "gt", label: ">" },
+    { value: "eq", label: "=" },
+    { value: "lt", label: "<" },
   ];
 
   return (
     <div className="animate-slide-up flex flex-col gap-8">
-      <header className="flex flex-col gap-4">
+      <header className="flex flex-col gap-5">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             Goals
@@ -63,42 +123,128 @@ export default async function CoachGoalsPage({
           </p>
         </div>
 
-        <div
-          className="inline-flex w-fit rounded-lg border border-border bg-surface-sunken p-1 text-sm"
-          role="tablist"
-          aria-label="Which mentees to show"
+        {/* Filters live in the URL, so a filtered board is a link you can share
+            or bookmark. */}
+        <form
+          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:items-end [&>*]:min-w-0"
+          role="search"
         >
-          {scopes.map((s) => (
-            <Link
-              key={s.key}
-              href={s.href}
-              role="tab"
-              aria-selected={scope === s.key}
-              className={cn(
-                "rounded-md px-3 py-1.5 font-medium transition-colors",
-                scope === s.key
-                  ? "bg-surface text-foreground shadow-sm"
-                  : "text-muted hover:text-foreground",
-              )}
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="f-council"
+              className="text-sm font-medium text-muted-strong"
             >
-              {s.label}
-            </Link>
-          ))}
-        </div>
+              Council
+            </label>
+            <Select
+              id="f-council"
+              name="council"
+              options={councilOptions}
+              defaultValue={council}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="f-search"
+              className="text-sm font-medium text-muted-strong"
+            >
+              Mentee
+            </label>
+            <Input
+              id="f-search"
+              name="search"
+              type="search"
+              defaultValue={search ?? ""}
+              placeholder="Name"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="f-category"
+              className="text-sm font-medium text-muted-strong"
+            >
+              Category
+            </label>
+            <Select
+              id="f-category"
+              name="category"
+              options={categoryOptions}
+              defaultValue={category ?? ""}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="f-op"
+              className="text-sm font-medium text-muted-strong"
+            >
+              Goal score
+            </label>
+            <div className="flex gap-2">
+              <Select
+                id="f-op"
+                name="op"
+                aria-label="Score operator"
+                options={opOptions}
+                defaultValue={scoreOp ?? ""}
+                className="w-24 shrink-0"
+              />
+              <Input
+                name="score"
+                type="number"
+                min={0}
+                max={100}
+                aria-label="Score percentage"
+                defaultValue={scoreValue !== undefined ? String(scoreValue) : ""}
+                placeholder="%"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 sm:col-span-2 lg:col-span-4">
+            <Button type="submit" icon={<Search />}>
+              Apply filters
+            </Button>
+            {filtersActive ? (
+              <Link
+                href="/coach/goals"
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Clear
+              </Link>
+            ) : null}
+          </div>
+        </form>
       </header>
 
       {groups.length === 0 ? (
         <EmptyState
           icon={Target}
           title={
-            scope === "councils"
-              ? "No mentees in your councils yet"
-              : "No mentees to show"
+            filtersActive
+              ? "Nothing matches these filters"
+              : council === "all"
+                ? "No mentees to show"
+                : "No mentees in your councils yet"
           }
           description={
-            scope === "councils"
-              ? "Once mentees are placed in a council you lead, their goals gather here."
-              : "No mentee in the organization is visible to you yet."
+            filtersActive
+              ? "No mentee or goal matches the current filters. Try widening them."
+              : council === "all"
+                ? "No mentee in the organization is visible to you yet."
+                : "Once mentees are placed in a council you lead, their goals gather here."
+          }
+          action={
+            filtersActive ? (
+              <Link
+                href="/coach/goals"
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Clear filters
+              </Link>
+            ) : undefined
           }
         />
       ) : (
@@ -117,7 +263,7 @@ export default async function CoachGoalsPage({
                   size="sm"
                 />
                 <Link
-                  href={`/coach/mentees/${group.mentee.id}`}
+                  href={`/coach/mentees/${group.mentee.id}?${fromQuery}`}
                   className="font-semibold text-foreground hover:text-primary"
                 >
                   {group.mentee.firstName} {group.mentee.lastName}
@@ -148,7 +294,7 @@ export default async function CoachGoalsPage({
                     {group.goals.map((goal) => (
                       <li key={goal.id}>
                         <Link
-                          href={`/goals/${goal.id}`}
+                          href={`/goals/${goal.id}?${fromQuery}`}
                           className="flex flex-col gap-2 px-4 py-3 transition-colors hover:bg-surface-sunken sm:flex-row sm:items-center sm:gap-4"
                         >
                           <div className="flex min-w-0 flex-1 items-center gap-3">
